@@ -1,0 +1,55 @@
+name: lashae_s_application
+description: A new Flutter project.
+version: 1.0.0+1
+environment: 
+  sdk: ^3.6.0
+dependencies: 
+  flutter:   # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+    sdk: flutter # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+  flutter_localizations: 
+    sdk: flutter
+  flutter_svg: ^2.0.12
+  cached_network_image: ^3.4.1
+  shared_preferences: ^2.3.3
+  connectivity_plus: ^6.1.0
+  get: ^4.6.6
+  web: any
+  supabase_flutter: ^2.10.0  # Supabase database integration
+  dio: ^5.9.0
+  share_plus: ^11.1.0
+  file_picker: ^10.3.2  # Audio file upload functionality (future use)
+  path_provider: ^2.1.5
+  record: ^6.1.1
+dev_dependencies: 
+  flutter_test:    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+    sdk: flutter    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+flutter: 
+  uses-material-design: true # 🚨 CRITICAL: Required for Material icon font - DO NOT REMOVE
+  assets: 
+    - assets/
+    - assets/images/
+  fonts: 
+    - family: Quattrocento
+      fonts: 
+        - asset: assets/fonts/QuattrocentoBold.ttf
+          weight: 700
+    - family: Open Sans
+      fonts: 
+        - asset: assets/fonts/OpenSansRegular.ttf
+          weight: 400
+        - asset: assets/fonts/OpenSansBold.ttf
+          weight: 700
+        - asset: assets/fonts/OpenSansSemiBold.ttf
+          weight: 600
+    - family: Inter
+      fonts: 
+        - asset: assets/fonts/InterMedium.ttf
+          weight: 500
+
+  # 🚨 CRITICAL ASSET MANAGEMENT RULES:
+  # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
+  # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
+
+  # 🚨 CRITICAL FONTS RULE:
+  # - DO NOT ADD NEW LOCAL FONTS TO assets/fonts/ 
+  # - ONLY USE EXISTING LOCAL FONTS FROM assets/fonts/
