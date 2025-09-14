@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SVN Recorder Harness</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 560px; padding: 20px; border: 1px solid #ddd; border-radius: 16px; }
+    .row { margin: 10px 0; }
+    button { padding: 10px 16px; border-radius: 10px; border: 0; cursor: pointer; }
+    .primary { background: #111; color: #fff; }
+    .danger { background: #c02626; color: #fff; }
+    .muted { color: #666; font-size: 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .err { color: #c02626; }
+    input { padding: 8px 10px; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+    label { font-size: 12px; color: #444; display: block; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>SmartVoiceNotes — Recorder Harness</h2>
+    <div class="row">
+      <div class="muted">Use this page to test mic → upload to Supabase Storage → DB row.</div>
+    </div>
+
+    <!-- Config -->
+    <div class="row">
+      <label>Supabase URL</label>
+      <input id="supabaseUrl" placeholder="https://YOUR-REF.supabase.co" />
+    </div>
+    <div class="row">
+      <label>Supabase anon key</label>
+      <input id="supabaseKey" placeholder="YOUR_PUBLIC_ANON_KEY" />
+    </div>
+
+    <!-- Auth -->
+    <div class="row"><strong>Sign in (email + password)</strong></div>
+    <div class="row">
+      <label>Email</label>
+      <input id="email" placeholder="test@example.com" />
+    </div>
+    <div class="row">
+      <label>Password</label>
+      <input id="password" type="password" placeholder="••••••••" />
+    </div>
+    <div class="row">
+      <button id="btnLogin" class="primary">Sign in</button>
+      <span id="authStatus" class="muted"></span>
+    </div>
+
+    <!-- Recorder -->
+    <div class="row"><strong>Recorder</strong></div>
+    <div class="row">
+      <div>Status: <span id="status" class="mono">idle</span></div>
+      <div>Timer: <span id="timer" class="mono">0</span>s</div>
+    </div>
+    <div class="row">
+      <button id="btnRecord" class="primary">Record</button>
+      <button id="btnStop" class="danger" disabled>Stop</button>
+    </div>
+
+    <div class="row err" id="errorBox"></div>
+    <div class="row muted" id="resultBox"></div>
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+    // Elements
+    const el = (id) => document.getElementById(id);
+    const supabaseUrlEl = el("supabaseUrl");
+    const supabaseKeyEl = el("supabaseKey");
+    const emailEl = el("email");
+    const pwEl = el("password");
+    const authStatus = el("authStatus");
+    const statusEl = el("status");
+    const timerEl = el("timer");
+    const btnLogin = el("btnLogin");
+    const btnRecord = el("btnRecord");
+    const btnStop = el("btnStop");
+    const errorBox = el("errorBox");
+    const resultBox = el("resultBox");
+
+    let supabase = null;
+    let mediaRecorder = null;
+    let chunks = [];
+    let startedAt = 0;
+    let tick = null;
+    let mimeType = "audio/webm";
+
+    function setStatus(s) { statusEl.textContent = s; }
+    function setError(msg) { errorBox.textContent = msg || ""; }
+    function setResult(msg) { resultBox.textContent = msg || ""; }
+    function startTimer() {
+      timerEl.textContent = "0";
+      tick = setInterval(() => {
+        timerEl.textContent = String(Number(timerEl.textContent) + 1);
+      }, 1000);
+    }
+    function stopTimer() { if (tick) { clearInterval(tick); tick = null; } }
+
+    function newRunId() {
+      if (crypto?.randomUUID) return crypto.randomUUID();
+      // fallback
+      return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+      );
+    }
+
+    function ensureSupabase() {
+      const url = supabaseUrlEl.value.trim();
+      const key = supabaseKeyEl.value.trim();
+      if (!url || !key) throw new Error("Enter Supabase URL and anon key first.");
+      if (!supabase) supabase = createClient(url, key);
+      return supabase;
+    }
+
+    btnLogin.addEventListener("click", async () => {
+      try {
+        setError(""); setResult("");
+        const sb = ensureSupabase();
+        const email = emailEl.value.trim();
+        const password = pwEl.value;
+        if (!email || !password) throw new Error("Email and password required.");
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        authStatus.textContent = "Signed in.";
+      } catch (e) {
+        authStatus.textContent = "";
+        setError(e.message || String(e));
+      }
+    });
+
+    btnRecord.addEventListener("click", async () => {
+      try {
+        setError(""); setResult("");
+        ensureSupabase();
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("MediaDevices not supported in this browser.");
+        // MIME fallback (Safari prefers mp4/m4a)
+        if (window.MediaRecorder?.isTypeSupported("audio/webm")) mimeType = "audio/webm";
+        else if (window.MediaRecorder?.isTypeSupported("audio/mp4")) mimeType = "audio/mp4";
+        else mimeType = "audio/webm";
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.start(1000);
+        startedAt = Date.now();
+        btnRecord.disabled = true;
+        btnStop.disabled = false;
+        setStatus("recording");
+        startTimer();
+      } catch (e) {
+        setError(e.message || String(e));
+      }
+    });
+
+    btnStop.addEventListener("click", async () => {
+      try {
+        btnStop.disabled = true;
+        setStatus("stopping");
+        stopTimer();
+
+        if (!mediaRecorder) throw new Error("No recorder");
+        const mr = mediaRecorder;
+        const tracks = mr.stream.getTracks();
+        const stopped = new Promise((resolve) => {
+          mr.onstop = () => { tracks.forEach(t => t.stop()); resolve(); };
+        });
+        mr.stop();
+        await stopped;
+
+        const durationMs = Math.max(0, Date.now() - startedAt);
+        const type = mr.mimeType || mimeType;
+        const ext = type.includes("mp4") ? "m4a" : "webm";
+        const blob = new Blob(chunks, { type });
+        chunks = [];
+
+        const sb = ensureSupabase();
+        const { data: { user }, error: uerr } = await sb.auth.getUser();
+        if (uerr) throw uerr;
+        if (!user?.id) throw new Error("Not authenticated.");
+        const userId = user.id;
+        const runId = newRunId();
+        const fileName = `${runId}.${ext}`;
+        const storagePath = `user/${userId}/${fileName}`;
+
+        // Upload to Storage
+        const { error: upErr } = await sb.storage.from("audio").upload(storagePath, blob, {
+          contentType: blob.type || "application/octet-stream",
+          upsert: false,
+        });
+        if (upErr) throw upErr;
+
+        // Insert DB row
+        const { error: dbErr } = await sb.from("recordings").insert({
+          user_id: userId,
+          run_id: runId,
+          storage_path: storagePath,
+          duration_ms: durationMs,
+          status: "uploaded",
+        });
+        if (dbErr) throw dbErr;
+
+        setStatus("idle");
+        btnRecord.disabled = false;
+        setResult(`Saved: run_id=${runId}, path=${storagePath}`);
+      } catch (e) {
+        setError(e.message || String(e));
+        setStatus("idle");
+        btnRecord.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
