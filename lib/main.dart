@@ -1,96 +1,85 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import './core/utils/preview_mode_detector.dart';
-import './services/supabase_service.dart';
-import 'core/app_export.dart';
+import 'env.dart';
+import 'diagnostics_page.dart';
+import 'recorder_page.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🎯 Preview Mode Detection & External Initializers with Timeout
-  await _initializeExternalServices();
+  // Load your existing environment values (may be nullable)
+  await Env.load();
 
-  // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
-    value,
-  ) {
-    runApp(MyApp());
-  });
+  // Fallback to --dart-define if Env fields are null/empty
+  final url = (Env.supabaseUrl ?? const String.fromEnvironment('SUPABASE_URL')).trim();
+  final anon = (Env.supabaseAnonKey ?? const String.fromEnvironment('SUPABASE_ANON_KEY')).trim();
+
+  if (url.isEmpty || anon.isEmpty) {
+    // Fail early with a clear message instead of a cryptic crash
+    throw Exception(
+      'Supabase URL or anon key is missing.\n'
+      'Provide them via Env.supabaseUrl / Env.supabaseAnonKey or --dart-define.',
+    );
+  }
+
+  await Supabase.initialize(
+    url: url,
+    anonKey: anon,
+  );
+
+  runApp(const App());
 }
 
-/// Initialize external services with preview mode timeout handling
-Future<void> _initializeExternalServices() async {
-  // Initialize Supabase with preview mode timeout
-  await PreviewModeDetector.withPreviewTimeoutVoid(
-    () async {
-      await SupabaseService.instance.initialize();
-      debugPrint('✅ Supabase initialized successfully');
-    },
-    serviceName: 'Supabase',
-  );
+class App extends StatelessWidget {
+  const App({super.key});
 
-  // Initialize OpenAI service with preview mode timeout
-  await PreviewModeDetector.withPreviewTimeoutVoid(
-    () async {
-      // OpenAI service auto-initializes, just verify API key exists
-      const apiKey = String.fromEnvironment('OPENAI_API_KEY');
-      if (apiKey.isNotEmpty) {
-        debugPrint('✅ OpenAI API key configured');
-      } else if (!PreviewModeDetector.isPreviewMode) {
-        debugPrint('⚠️ OpenAI API key not configured');
-      }
-    },
-    serviceName: 'OpenAI',
-  );
-
-  // Initialize any other remote config services here
-  await PreviewModeDetector.withPreviewTimeoutVoid(
-    () async {
-      // Add any other remote configuration initialization here
-      // Example: Firebase Remote Config, Analytics, etc.
-      debugPrint('✅ Remote config services initialized');
-    },
-    serviceName: 'Remote Config',
-  );
-
-  if (PreviewModeDetector.isPreviewMode) {
-    debugPrint(
-        '🎭 Preview mode active - External services initialized with fallbacks');
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SmartVoiceNotes',
+      debugShowCheckedModeBanner: false,
+      home: const HomeGate(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/dev/diagnostics':
+            return MaterialPageRoute(builder: (_) => const DiagnosticsPage());
+          case '/dev/record':
+            return MaterialPageRoute(builder: (_) => const RecorderPage());
+          default:
+            return MaterialPageRoute(builder: (_) => const HomeGate());
+        }
+      },
+    );
   }
 }
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+class HomeGate extends StatelessWidget {
+  const HomeGate({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return Sizer(
-      builder: (context, orientation, deviceType) {
-        return GetMaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: theme,
-          locale: Locale('en', ''),
-          fallbackLocale: Locale('en', ''),
-          title: 'lashae_s_application',
-          // PREVIEW HEALTH CHECK - SET AS INITIAL ROUTE FOR TESTING
-          initialRoute: AppRoutes
-              .previewHealthCheckScreen, // Health check screen for preview testing
-          // NORMAL ROUTES (COMMENTED FOR PREVIEW TESTING)
-          // initialRoute: AppRoutes.getInitialRoute(), // Dynamic initial route based on auth state
-          // initialRoute: AppRoutes.recordingReadyScreenInitialPage, // Force directory screen for preview testing
-          getPages: AppRoutes.pages,
-          // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
-          builder: (context, child) {
-            return MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(1.0)),
-              child: child!,
-            );
-          },
-          // 🚨 END CRITICAL SECTION
-        );
-      },
+    return Scaffold(
+      appBar: AppBar(title: const Text('SmartVoiceNotes')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('ENV: ${Env.appEnv}'),
+            if (kDebugMode)
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/dev/diagnostics'),
+                child: const Text('Open Diagnostics (dev only)'),
+              ),
+            if (kDebugMode)
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/dev/record'),
+                child: const Text('Open Recorder (dev)'),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

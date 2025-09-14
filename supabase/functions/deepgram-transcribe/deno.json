@@ -1,0 +1,8 @@
+{
+  "deploy": {
+    "exclude": ["**/node_modules"]
+  },
+  "tasks": {
+    "start": "deno run -A --watch=static/,index.ts index.ts"
+  }
+}
