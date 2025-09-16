@@ -1,3 +1,4 @@
+// lib/services/supabase_upload.dart
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -19,37 +20,39 @@ class SupaUpload {
   }
 
   /// Upload a recording to Storage and insert a DB row.
-  /// Includes soft quotas and file size guardrails.
+  /// NOTE: This is legacy/utility code. Your main flow uses `Pipeline`.
   static Future<UploadResult> uploadRecording({
     required File file,
     required Duration duration,
-    required String mime, // 'audio/wav' on Windows; 'audio/m4a' elsewhere
+    required String mime, // e.g. 'audio/wav' or 'audio/m4a'
   }) async {
     final userId = await _requireUserId();
     final runId = _uuid.v4();
     final ext = mime.contains('wav') ? 'wav' : 'm4a';
     final fileName = '$runId.$ext';
     final storagePath = 'user/$userId/$fileName';
+
+    // Bucket name kept as in your original file. Change to 'recordings' if needed.
     final storage = Supa.client.storage.from('audio');
 
     // ----- Guardrails -----
-    // File size cap (client-side). Tweak as needed.
     const maxBytes = 50 * 1024 * 1024; // 50 MB
     final size = await file.length();
     if (size > maxBytes) {
-      throw Exception('File too large (${(size / (1024 * 1024)).toStringAsFixed(1)} MB). '
-          'Limit is ${(maxBytes / (1024 * 1024)).toStringAsFixed(0)} MB.');
+      throw Exception(
+        'File too large (${(size / (1024 * 1024)).toStringAsFixed(1)} MB). '
+        'Limit is ${(maxBytes / (1024 * 1024)).toStringAsFixed(0)} MB.',
+      );
     }
 
-    // Soft quota: max N recordings per user (client-side).
-    // NOTE: This is advisory; RLS still protects ownership. For hard limits,
-    // add a DB trigger or enforce via an Edge Function that issues signed URLs.
+    // Soft quota (client-side): count by fetching ids and taking length.
+    // This avoids the old FetchOptions API entirely.
     const maxRecordingsPerUser = 500;
-    final countResp = await Supa.client
+    final rows = await Supa.client
         .from('recordings')
-        .select('id', count: CountOption.exact)
+        .select('id')
         .eq('user_id', userId);
-    final currentCount = countResp.count ?? 0;
+    final currentCount = (rows as List).length;
     if (currentCount >= maxRecordingsPerUser) {
       throw Exception('Quota exceeded: max $maxRecordingsPerUser recordings per user.');
     }
@@ -63,7 +66,7 @@ class SupaUpload {
     );
 
     try {
-      // 2) Insert DB row (throws PostgrestException on failure)
+      // 2) Insert DB row
       await Supa.client.from('recordings').insert({
         'user_id': userId,
         'run_id': runId,
@@ -73,41 +76,40 @@ class SupaUpload {
       });
     } catch (e) {
       // Roll back storage if DB insert fails
-      try { await storage.remove([storagePath]); } catch (_) {}
+      try {
+        await storage.remove([storagePath]);
+      } catch (_) {}
       rethrow;
     }
 
     return UploadResult(runId: runId, storagePath: storagePath);
   }
 
-  /// Delete the file from Storage and its DB row (by runId), scoped to current user.
+  /// Delete file+row scoped to current user.
   static Future<void> deleteRecording({
     required String runId,
     required String storagePath,
   }) async {
     final userId = await _requireUserId();
 
-    // Delete DB row first so UI lists don’t show ghosts.
     await Supa.client
         .from('recordings')
         .delete()
         .match({'user_id': userId, 'run_id': runId});
 
-    // Then delete object from Storage.
     final storage = Supa.client.storage.from('audio');
     await storage.remove([storagePath]);
   }
 
-  /// Fetch recent recordings for the current user (RLS enforces isolation).
+  /// Fetch recent recordings for current user.
   static Future<List<Map<String, dynamic>>> listMyRecordings({int limit = 20}) async {
-    await _requireUserId(); // ensures logged in
+    await _requireUserId();
     final rows = await Supa.client
         .from('recordings')
         .select('run_id, storage_path, duration_ms, status, created_at')
         .order('created_at', ascending: false)
         .limit(limit);
 
-    // Supabase Dart returns dynamic; coerce to List<Map<String, dynamic>>
     return List<Map<String, dynamic>>.from(rows as List);
   }
 }
