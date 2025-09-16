@@ -2,10 +2,12 @@ import 'core/utils/size_utils.dart' as su;  // Rocket’s internal sizing utils
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import './core/utils/preview_mode_detector.dart';
-import './services/supabase_service.dart';
-import 'core/app_export.dart';             // keep if your project expects it
-import 'theme/theme_helper.dart' as sv;          // SVTheme with deep-blue headings
+// main.dart (only high-level deps)
+import 'package:your_app/services/supabase_service.dart';
+import 'package:your_app/theme/theme_helper.dart' as sv;
+import 'package:your_app/routes/app_routes.dart';
+import 'package:your_app/core/utils/preview_mode_detector.dart';
+import 'package:get/get.dart';          // SVTheme with deep-blue headings
 // AppRoutes.homeScreen, AppRoutes.pages
 
 Future<void> main() async {
