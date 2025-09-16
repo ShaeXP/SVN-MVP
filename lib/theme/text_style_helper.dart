@@ -19,21 +19,21 @@ class TextStyleHelper {
         fontSize: 60.fSize,
         fontWeight: FontWeight.w700,
         fontFamily: 'Quattrocento',
-        color: appTheme.gray_900,
+        color: appTheme.primary,
       );
 
   TextStyle get display48BoldQuattrocento => TextStyle(
         fontSize: 48.fSize,
         fontWeight: FontWeight.w700,
         fontFamily: 'Quattrocento',
-        color: appTheme.gray_900,
+        color: appTheme.primary,
       );
 
   TextStyle get display36BoldQuattrocento => TextStyle(
         fontSize: 36.fSize,
         fontWeight: FontWeight.w700,
         fontFamily: 'Quattrocento',
-        color: appTheme.gray_900,
+        color: appTheme.primary,
       );
 
   // Headline Styles
@@ -43,14 +43,14 @@ class TextStyleHelper {
         fontSize: 30.fSize,
         fontWeight: FontWeight.w700,
         fontFamily: 'Quattrocento',
-        color: appTheme.gray_900,
+        color: appTheme.primary,
       );
 
   TextStyle get headline24BoldQuattrocento => TextStyle(
         fontSize: 24.fSize,
         fontWeight: FontWeight.w700,
         fontFamily: 'Quattrocento',
-        color: appTheme.gray_900,
+        color: appTheme.primary,
       );
 
   // Title Styles
@@ -67,6 +67,7 @@ class TextStyleHelper {
         fontSize: 20.fSize,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
+        color: appTheme.gray_900,
       );
 
   TextStyle get title18BoldQuattrocento => TextStyle(
@@ -80,7 +81,7 @@ class TextStyleHelper {
         fontSize: 18.fSize,
         fontWeight: FontWeight.w400,
         fontFamily: 'Open Sans',
-        color: appTheme.gray_700,
+        color: appTheme.gray_900,
       );
 
   TextStyle get title18MediumInter => TextStyle(
@@ -101,7 +102,7 @@ class TextStyleHelper {
         fontSize: 18.fSize,
         fontWeight: FontWeight.w600,
         fontFamily: 'Open Sans',
-        color: appTheme.cyan_900,
+        color: appTheme.accentIndigo,
       );
 
   TextStyle get title16MediumInter => TextStyle(
@@ -159,4 +160,17 @@ class TextStyleHelper {
   // Miscellaneous text styles without specified font size
 
   TextStyle get textStyle18 => TextStyle();
+
+  // New helper styles for links and muted text
+  TextStyle get body14Link => TextStyle(
+      fontSize: 14.fSize,
+      fontWeight: FontWeight.w600,
+      fontFamily: 'Open Sans',
+      color: appTheme.accentIndigo);
+
+  TextStyle get body12Muted => TextStyle(
+      fontSize: 12.fSize,
+      fontWeight: FontWeight.w400,
+      fontFamily: 'Open Sans',
+      color: appTheme.gray_700);
 }

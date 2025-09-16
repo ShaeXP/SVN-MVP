@@ -44,6 +44,7 @@ class RecordingLibraryScreen extends StatelessWidget {
                         _buildHeaderSection(),
                         _buildSearchSection(),
                         _buildFilterSection(),
+                        _buildErrorBanner(),
                         _buildRecordingsListSection(),
                         _buildSeparatorLine(),
                       ],
@@ -169,11 +170,9 @@ class RecordingLibraryScreen extends StatelessWidget {
           ),
           SizedBox(width: 10.h),
           CustomButton(
-            text: 'Sort & Filter',
-            leftIcon: ImageConstant.imgImage,
-            onPressed: () {
-              // TODO: Implement filter dialog
-            },
+            text: 'Refresh',
+            leftIcon: ImageConstant.imgRotateCcw,
+            onPressed: controller.onRefresh,
             backgroundColor: appTheme.white_A700,
             textColor: appTheme.gray_700,
             borderColor: appTheme.gray_300,
@@ -186,6 +185,47 @@ class RecordingLibraryScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildErrorBanner() {
+    return Obx(() {
+      if (!controller.hasError) return SizedBox.shrink();
+
+      return Container(
+        margin: EdgeInsets.symmetric(horizontal: 16.h),
+        padding: EdgeInsets.all(12.h),
+        decoration: BoxDecoration(
+          color: appTheme.gray_50,
+          borderRadius: BorderRadius.circular(8.h),
+          border: Border.all(color: appTheme.red_400),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: appTheme.red_400,
+              size: 20.h,
+            ),
+            SizedBox(width: 8.h),
+            Expanded(
+              child: Text(
+                controller.errorMessage,
+                style: TextStyleHelper.instance.body14RegularOpenSans
+                    .copyWith(color: appTheme.red_700),
+              ),
+            ),
+            TextButton(
+              onPressed: controller.onRetry,
+              child: Text(
+                'Retry',
+                style: TextStyleHelper.instance.body14SemiBoldOpenSans
+                    .copyWith(color: appTheme.red_700),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildRecordingsListSection() {
@@ -221,6 +261,9 @@ class RecordingLibraryScreen extends StatelessWidget {
                     onTap: () {
                       controller.onOpenNotePressed(item.id);
                     },
+                    onDelete: () {
+                      controller.onDeletePressed(item.id);
+                    },
                   ))
               .toList(),
         );
@@ -244,13 +287,13 @@ class RecordingLibraryScreen extends StatelessWidget {
             spacing: 8.h,
             children: [
               Text(
-                'No recordings yet',
+                'No notes yet',
                 style: TextStyleHelper.instance.title20BoldQuattrocento
                     .copyWith(color: appTheme.gray_900),
                 textAlign: TextAlign.center,
               ),
               Text(
-                'Start recording to see your library here',
+                'Record or upload to see them here',
                 style: TextStyleHelper.instance.body14RegularOpenSans
                     .copyWith(color: appTheme.gray_700),
                 textAlign: TextAlign.center,

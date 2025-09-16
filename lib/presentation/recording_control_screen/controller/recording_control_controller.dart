@@ -1,114 +1,125 @@
-import '../../../core/app_export.dart';
-import '../../../services/recording_store.dart';
-import '../models/recording_control_model.dart';
+// lib/presentation/recording_control_screen/controller/recording_control_controller.dart
+import 'dart:async';
+import 'dart:typed_data';
+import 'package:get/get.dart';
+import 'package:http/http.dart' as http; // Add this import
+import '../../../routes/app_routes.dart';
+import '../../../services/pipeline.dart';
+import '../../../services/supabase_service.dart';
+
+/// Minimal stub to keep the legacy screen compiling.
+/// It does not touch the microphone or the `record` plugin.
+enum RecState { idle, recording, paused, stopped }
 
 class RecordingControlController extends GetxController {
-  Rx<RecordingControlModel> recordingControlModelObj =
-      RecordingControlModel().obs;
+  final Rx<RecState> currentState = RecState.idle.obs;
+  final RxString timerText = '00:00'.obs;
 
-  // Recording store instance
-  final RecordingStore _recordingStore = Get.find<RecordingStore>();
+  // Add missing properties
+  final RxBool isUploading = false.obs;
+  final RxBool isProcessing = false.obs;
 
-  // Current recording ID
-  String? currentRecordingId;
+  Timer? _ticker;
+  DateTime? _startedAt;
 
-  @override
-  void onInit() {
-    super.onInit();
-    // Get recordingId from arguments or RecordingStore
-    final arguments = Get.arguments as Map<String, dynamic>?;
-    currentRecordingId = arguments?['recordingId'] ?? _recordingStore.currentId;
+  // Add recording data storage
+  Uint8List? _audioFile;
+  int? _durationMs;
+
+  void start() {
+    currentState.value = RecState.recording;
+    _startedAt = DateTime.now();
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final s = _startedAt;
+      if (s == null) return;
+      final d = DateTime.now().difference(s);
+      final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+      final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+      timerText.value = '$mm:$ss';
+    });
   }
 
-  @override
-  void onReady() {
-    super.onReady();
+  void pause() {
+    currentState.value = RecState.paused;
+    _ticker?.cancel();
   }
 
-  /// btn_save → Finalize recording with optimistic updates and rollback
-  void onSavePressed() async {
-    if (currentRecordingId == null) {
-      Get.snackbar(
-        'Error',
-        'No recording ID available',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
-      return;
+  void resume() {
+    start();
+  }
+
+  void stop() {
+    currentState.value = RecState.stopped;
+    _ticker?.cancel();
+  }
+
+  // Add missing method to set recording data
+  void setRecordingData(Uint8List audioFile, int durationMs) {
+    _audioFile = audioFile;
+    _durationMs = durationMs;
+  }
+
+  // Add missing save method
+  Future<void> onSavePressed() async {
+    if (_audioFile == null || _durationMs == null) {
+      throw Exception('No recording data to save');
     }
 
+    final user = SupabaseService.instance.client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please sign in to save');
+    }
+
+    isUploading.value = true;
     try {
-      // Create recording with current recordingId
-      final now = DateTime.now();
-      final hours =
-          now.hour == 0 ? 12 : (now.hour > 12 ? now.hour - 12 : now.hour);
-      final amPm = now.hour >= 12 ? 'PM' : 'AM';
-      final formattedDate =
-          "${now.month}/${now.day}/${now.year} ${hours}:${now.minute.toString().padLeft(2, '0')} $amPm";
+      final pipeline = Pipeline();
+      final runId = await pipeline.initRun();
 
-      final computedTitle =
-          "Recording ${now.toIso8601String().substring(0, 16).replaceAll('T', ' ')}";
-      final measuredDuration =
-          "3:45"; // Mock duration - would come from actual recording
+      // For web recordings, assume webm format
+      final ext = '.webm';
+      final storagePath = 'user/${user.id}/$runId$ext';
 
-      // Use RecordingStore.addOrUpdate with only available parameters (no Rx types)
-      await _recordingStore.addOrUpdate(
-        id: currentRecordingId!,
-        title: computedTitle,
-        date: formattedDate,
-        duration: measuredDuration,
+      final signedUrl = await pipeline.signUpload(storagePath);
+      await uploadBytesPut(signedUrl, _audioFile!);
+
+      await pipeline.insertRecording(
+        runId: runId,
+        storagePathOrUrl: storagePath,
+        durationMs: _durationMs!,
       );
 
-      // Clear current recording ID from store
-      _recordingStore.clearCurrentId();
+      isUploading.value = false;
+      isProcessing.value = true;
 
-      // Show success message
-      Get.snackbar(
-        'Success',
-        'Recording saved successfully',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: appTheme.green_600,
-        colorText: appTheme.white_A700,
-      );
+      await pipeline.startAsr(runId, storagePath);
 
-      // Navigate to Recording Success Confirmation with recordingId
-      Get.toNamed(
-        AppRoutes.recordingSuccessScreen,
-        arguments: {'recordingId': currentRecordingId},
+      Get.offAllNamed(
+        AppRoutes.recordingSummaryScreen,
+        arguments: {'run_id': runId},
       );
     } catch (e) {
-      // Error is already handled by RecordingStore (rollback occurred)
-      Get.snackbar(
-        'Error',
-        'Failed to save recording. Please try again.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
+      isUploading.value = false;
+      isProcessing.value = false;
+      rethrow;
     }
   }
 
-  /// btn_redo → Active Recording Screen with same recordingId
-  void onRedoPressed() {
-    // Navigate back to Active Recording Screen with same recordingId
-    Get.toNamed(
-      AppRoutes.activeRecordingScreen,
-      arguments: {'recordingId': currentRecordingId},
+  // Add the missing uploadBytesPut method
+  Future<void> uploadBytesPut(String signedUrl, Uint8List bytes) async {
+    final res = await http.put(
+      Uri.parse(signedUrl),
+      headers: {'Content-Type': 'audio/webm'},
+      body: bytes,
     );
-  }
-
-  /// btn_cancel → Active Recording Screen with same recordingId
-  void onCancelPressed() {
-    // Navigate back to Active Recording Screen with same recordingId
-    Get.toNamed(
-      AppRoutes.activeRecordingScreen,
-      arguments: {'recordingId': currentRecordingId},
-    );
+    if (res.statusCode != 200) {
+      throw Exception('Upload failed: ${res.statusCode}');
+    }
   }
 
   @override
   void onClose() {
+    _ticker?.cancel();
     super.onClose();
   }
 }

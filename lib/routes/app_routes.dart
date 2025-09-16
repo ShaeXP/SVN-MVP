@@ -1,36 +1,40 @@
 import 'package:get/get.dart';
-import '../presentation/recording_paused_screen/recording_paused_screen.dart';
-import '../presentation/recording_ready_screen/recording_ready_screen.dart';
-import '../presentation/active_recording_screen/active_recording_screen.dart';
-import '../presentation/recording_summary_screen/recording_summary_screen.dart';
-import '../presentation/welcome_screen/welcome_screen.dart';
-import '../presentation/home_screen/home_screen.dart';
-import '../presentation/recording_control_screen/recording_control_screen.dart';
-import '../presentation/recording_success_screen/recording_success_screen.dart';
-import '../presentation/login_success_screen/login_success_screen.dart';
-import '../presentation/login_screen/login_screen.dart';
-import '../presentation/recording_library_screen/recording_library_screen.dart';
-import '../presentation/settings_screen/settings_screen.dart';
-import '../presentation/main_navigation/main_navigation_screen.dart';
-import '../presentation/preview_health_check/preview_health_check.dart';
 
-import '../presentation/recording_paused_screen/binding/recording_paused_binding.dart';
-import '../presentation/recording_ready_screen/binding/recording_ready_binding.dart';
+import '../presentation/active_recording_screen/active_recording_screen.dart';
 import '../presentation/active_recording_screen/binding/active_recording_binding.dart';
-import '../presentation/recording_summary_screen/binding/recording_summary_binding.dart';
-import '../presentation/welcome_screen/binding/welcome_binding.dart';
-import '../presentation/home_screen/binding/home_binding.dart';
-import '../presentation/recording_control_screen/binding/recording_control_binding.dart';
-import '../presentation/recording_success_screen/binding/recording_success_binding.dart';
-import '../presentation/login_success_screen/binding/login_success_binding.dart';
-import '../presentation/login_screen/binding/login_binding.dart';
-import '../presentation/recording_library_screen/binding/recording_library_binding.dart';
-import '../presentation/settings_screen/binding/settings_binding.dart';
 import '../presentation/app_navigation_screen/app_navigation_screen.dart';
 import '../presentation/app_navigation_screen/binding/app_navigation_binding.dart';
-import '../presentation/recording_ready_screen/recording_ready_screen_initial_page.dart';
+import '../presentation/file_upload_screen/binding/file_upload_binding.dart';
+import '../presentation/file_upload_screen/file_upload_screen.dart';
+import '../presentation/home_screen/binding/home_binding.dart';
+import '../presentation/home_screen/home_screen.dart';
+import '../presentation/login_screen/binding/login_binding.dart';
+import '../presentation/login_screen/login_screen.dart';
+import '../presentation/login_success_screen/binding/login_success_binding.dart';
+import '../presentation/login_success_screen/login_success_screen.dart';
 import '../presentation/main_navigation/binding/main_navigation_binding.dart';
+import '../presentation/main_navigation/main_navigation_screen.dart';
 import '../presentation/preview_health_check/binding/preview_health_check_binding.dart';
+import '../presentation/preview_health_check/preview_health_check.dart';
+import '../presentation/recording_control_screen/binding/recording_control_binding.dart';
+import '../presentation/recording_control_screen/recording_control_screen.dart';
+import '../presentation/recording_library_screen/binding/recording_library_binding.dart';
+import '../presentation/recording_library_screen/recording_library_screen.dart';
+import '../presentation/recording_paused_screen/binding/recording_paused_binding.dart';
+import '../presentation/recording_paused_screen/recording_paused_screen.dart';
+import '../presentation/recording_ready_screen/binding/recording_ready_binding.dart';
+import '../presentation/recording_ready_screen/recording_ready_screen.dart';
+import '../presentation/recording_ready_screen/recording_ready_screen_initial_page.dart';
+import '../presentation/recording_success_screen/binding/recording_success_binding.dart';
+import '../presentation/recording_success_screen/recording_success_screen.dart';
+import '../presentation/recording_summary_screen/binding/recording_summary_binding.dart';
+import '../presentation/recording_summary_screen/recording_summary_screen.dart';
+import '../presentation/settings_screen/binding/settings_binding.dart';
+import '../presentation/settings_screen/settings_screen.dart';
+import '../presentation/supabase_transcription_test/binding/supabase_transcription_test_binding.dart';
+import '../presentation/supabase_transcription_test/supabase_transcription_test.dart';
+import '../presentation/welcome_screen/binding/welcome_binding.dart';
+import '../presentation/welcome_screen/welcome_screen.dart';
 import '../services/supabase_service.dart';
 
 // ignore_for_file: must_be_immutable
@@ -51,6 +55,9 @@ class AppRoutes {
   static const String settingsScreen = '/settings_screen';
   static const String mainNavigationScreen = '/main_navigation_screen';
   static const String previewHealthCheckScreen = '/preview-health-check';
+  static const String supabaseTranscriptionTestScreen =
+      '/supabase-transcription-test';
+  static const String fileUploadScreen = '/file_upload_screen';
 
   static const String appNavigationScreen = '/app_navigation_screen';
   static const String initialRoute = '/';
@@ -143,6 +150,12 @@ class AppRoutes {
       page: () => PreviewHealthCheckScreen(),
       bindings: [PreviewHealthCheckBinding()],
     ),
+    // Supabase transcription test screen
+    GetPage(
+      name: supabaseTranscriptionTestScreen,
+      page: () => SupabaseTranscriptionTestScreen(),
+      bindings: [SupabaseTranscriptionTestBinding()],
+    ),
     GetPage(
       name: appNavigationScreen,
       page: () => AppNavigationScreen(),
@@ -152,6 +165,11 @@ class AppRoutes {
       name: initialRoute,
       page: () => LoginScreen(), // Changed to start with LoginScreen
       bindings: [LoginBinding()],
+    ),
+    GetPage(
+      name: fileUploadScreen,
+      page: () => FileUploadScreen(),
+      bindings: [FileUploadBinding()],
     ),
   ];
 }

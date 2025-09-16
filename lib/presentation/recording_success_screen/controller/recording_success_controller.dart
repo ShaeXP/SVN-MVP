@@ -5,16 +5,16 @@ import '../../../core/app_export.dart';
 class RecordingSuccessController extends GetxController {
   RxInt selectedBottomNavIndex = 0.obs;
   RxBool isProcessing = false.obs;
-  RxString processingStatus = 'Initializing...'.obs;
-  String? currentRecordingId;
+  RxString processingStatus = 'Recording successfully saved.'.obs;
+  String? transcriptId;
   File? audioFile;
 
   @override
   void onInit() {
     super.onInit();
-    // Get recordingId from arguments
+    // Get transcript_id from arguments
     final arguments = Get.arguments as Map<String, dynamic>?;
-    currentRecordingId = arguments?['recordingId'];
+    transcriptId = arguments?['transcript_id'];
     audioFile = arguments?['audioFile'] as File?;
   }
 
@@ -23,15 +23,15 @@ class RecordingSuccessController extends GetxController {
     super.onReady();
   }
 
-  /// btn_goToSummary → Recording Summary Actions with recordingId
+  /// btn_goToSummary → Recording Summary Screen with transcript_id
   void onGoToSummaryPressed() async {
     if (isProcessing.value) return;
 
-    // Ensure we have a recordingId
-    if (currentRecordingId == null) {
+    // Ensure we have a transcript_id
+    if (transcriptId == null) {
       Get.snackbar(
         'Error',
-        'Recording ID not found',
+        'Transcript ID not found',
         snackPosition: SnackPosition.TOP,
         backgroundColor: appTheme.red_400,
         colorText: appTheme.white_A700,
@@ -40,10 +40,10 @@ class RecordingSuccessController extends GetxController {
       return;
     }
 
-    // Navigate to Recording Summary Actions with recordingId
+    // Navigate to Recording Summary Screen with transcript_id
     Get.toNamed(
       AppRoutes.recordingSummaryScreen,
-      arguments: {'recordingId': currentRecordingId},
+      arguments: {'transcript_id': transcriptId},
     );
   }
 
