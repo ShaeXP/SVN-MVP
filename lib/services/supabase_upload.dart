@@ -47,7 +47,7 @@ class SupaUpload {
     const maxRecordingsPerUser = 500;
     final countResp = await Supa.client
         .from('recordings')
-        .select('id', const FetchOptions(count: CountOption.exact))
+        .select('id', count: CountOption.exact)
         .eq('user_id', userId);
     final currentCount = countResp.count ?? 0;
     if (currentCount >= maxRecordingsPerUser) {
