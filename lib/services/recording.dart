@@ -1,9 +1,8 @@
 // lib/services/recording.dart
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
+import 'package:record/record.dart' as rec; // ← alias to avoid name clashes
 
 class RecordingResult {
   final File file;
@@ -16,53 +15,46 @@ abstract class RecordingService {
   Future<RecordingResult> stopRecording();
 }
 
-/// Real recorder (mobile). Prompts for mic permission when recording starts.
+/// Real recorder (device/emulator). Uses record v5 AudioRecorder API.
 class RealRecordingService implements RecordingService {
-  final AudioRecorder _rec =
-      AudioRecorder(); // Use AudioRecorder instead of Record
+  final rec.AudioRecorder _rec = rec.AudioRecorder();
   DateTime? _startedAt;
   String? _path;
 
   @override
   Future<void> startRecording() async {
-    if (kIsWeb) {
-      throw UnsupportedError(
-          'Microphone recording isn\'t supported in this web preview.');
-    }
-
+    // Permission gate
     final ok = await _rec.hasPermission();
     if (!ok) {
-      // Some Android/iOS versions won't show a system sheet unless you try to start.
-      // We still bail here to keep UX clear.
-      throw Exception('Microphone permission was not granted.');
+      throw Exception(
+        'Microphone permission not granted (or blocked by host). '
+        'On Android Emulator: More… › Microphone must be enabled.',
+      );
     }
+
+    // Optional: ensure encoder support; fallback if needed
+    final supportsHe = await _rec.isEncoderSupported(rec.AudioEncoder.aacHe);
+    final encoder = supportsHe ? rec.AudioEncoder.aacHe : rec.AudioEncoder.aacLc;
 
     final dir = await getTemporaryDirectory();
     _path = '${dir.path}/sv_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
-    await _rec.start(
-      const RecordConfig(
-        encoder: AudioEncoder.aacHe,
-        bitRate: 128000,
-        sampleRate: 44100,
-      ),
-      path: _path!,
+    final cfg = rec.RecordConfig(
+      encoder: encoder,
+      bitRate: 128000,
+      sampleRate: 44100,
     );
 
+    await _rec.start(cfg, path: _path!);
     _startedAt = DateTime.now();
   }
 
   @override
   Future<RecordingResult> stopRecording() async {
-    if (kIsWeb) {
-      throw UnsupportedError(
-          'Microphone recording isn\'t supported in this web preview.');
-    }
-
     final path = await _rec.stop();
     final p = path ?? _path;
     if (p == null) {
-      throw Exception('No audio captured.');
+      throw Exception('No audio captured. Try again after granting mic access.');
     }
 
     final dur = _startedAt == null
@@ -81,8 +73,7 @@ class MockRecordingService implements RecordingService {
   @override
   Future<RecordingResult> stopRecording() async {
     final dir = await getTemporaryDirectory();
-    final f =
-        File('${dir.path}/mock_${DateTime.now().millisecondsSinceEpoch}.m4a');
+    final f = File('${dir.path}/mock_${DateTime.now().millisecondsSinceEpoch}.m4a');
     await f.writeAsBytes(const <int>[]); // empty file
     return RecordingResult(file: f, durationMs: 1500);
   }
