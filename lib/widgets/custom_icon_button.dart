@@ -1,5 +1,8 @@
+import 'package:sizer/sizer.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/material.dart';
 
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../core/app_export.dart';
 import '../core/utils/size_utils.dart';
 import './custom_image_view.dart';

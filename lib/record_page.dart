@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'package:lashae_s_application/app/routes/app_pages.dart';
 
 class RecordPage extends StatefulWidget {
   const RecordPage({super.key});
@@ -51,8 +52,7 @@ class _RecordPageState extends State<RecordPage> {
     setState(() => _status = 'Microphone permission not granted.');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content:
-            const Text('Open OS microphone settings to allow access.'),
+        content: const Text('Open OS microphone settings to allow access.'),
         action: SnackBarAction(
           label: 'Open Settings',
           onPressed: () async {
@@ -97,7 +97,7 @@ class _RecordPageState extends State<RecordPage> {
       setState(() {
         _filePath = path;
         _isRecording = true;
-        _status = 'Recording…\n$path';
+        _status = 'Recordingâ€¦\n$path';
       });
     } catch (e) {
       setState(() => _status = 'Start error: $e');
@@ -133,12 +133,12 @@ class _RecordPageState extends State<RecordPage> {
   Future<void> _play() async {
     try {
       if (_filePath == null || !File(_filePath!).existsSync()) {
-        setState(() => _status = 'File missing — nothing to play');
+        setState(() => _status = 'File missing â€” nothing to play');
         return;
       }
       await _player.setFilePath(_filePath!);
       await _player.play();
-      setState(() => _status = 'Playing…');
+      setState(() => _status = 'Playingâ€¦');
     } catch (e) {
       setState(() => _status = 'Playback error: $e');
     }
@@ -154,8 +154,8 @@ class _RecordPageState extends State<RecordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-          AppBar(title: Text(_isDesktop ? 'Record Test (Desktop)' : 'Record Test')),
+      appBar: AppBar(
+          title: Text(_isDesktop ? 'Record Test (Desktop)' : 'Record Test')),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

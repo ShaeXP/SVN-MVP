@@ -1,3 +1,6 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:get/get.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -39,7 +42,7 @@ class RecordingLibraryController extends GetxController {
     searchController = TextEditingController();
 
     _subscribeToRuns(); // realtime (safe)
-    _loadRuns();        // initial fetch (safe)
+    _loadRuns(); // initial fetch (safe)
   }
 
   @override
@@ -130,12 +133,9 @@ class RecordingLibraryController extends GetxController {
       return RecordingItem(
         id: id,
         title: UseRunsList.getTitleFromSummary(summaryMap),
-        date: createdAt != null
-            ? UseRunsList.getRelativeTime(createdAt)
-            : '—',
-        duration: durationS > 0
-            ? UseRunsList.formatDuration(durationS)
-            : '',
+        date:
+            createdAt != null ? UseRunsList.getRelativeTime(createdAt) : 'â€”',
+        duration: durationS > 0 ? UseRunsList.formatDuration(durationS) : '',
         summaryText: summaryMap?['title'] as String?,
       );
     }).toList();
@@ -210,7 +210,7 @@ class RecordingLibraryController extends GetxController {
       args['run_id'] = recordingId;
     }
 
-    Get.toNamed(AppRoutes.recordingSummaryScreen, arguments: args);
+    Get.toNamed(Routes.recordingSummaryScreen, arguments: args);
   }
 
   /// Delete a recording with confirmation (defensive).
@@ -220,7 +220,9 @@ class RecordingLibraryController extends GetxController {
         title: const Text('Delete this note?'),
         content: const Text('This will remove the transcript and audio.'),
         actions: [
-          TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () => Get.back(result: true),
             child: Text('Delete', style: TextStyle(color: appTheme.red_400)),
@@ -288,13 +290,13 @@ class RecordingLibraryController extends GetxController {
     if (q.isEmpty) return runs;
 
     return runs.where((run) {
-      final Map<String, dynamic>? s =
-          run['summary_v1'] is Map<String, dynamic>
-              ? run['summary_v1'] as Map<String, dynamic>
-              : null;
+      final Map<String, dynamic>? s = run['summary_v1'] is Map<String, dynamic>
+          ? run['summary_v1'] as Map<String, dynamic>
+          : null;
 
       final title = UseRunsList.getTitleFromSummary(s).toLowerCase();
-      final transcript = (run['transcript_text'] as String? ?? '').toLowerCase();
+      final transcript =
+          (run['transcript_text'] as String? ?? '').toLowerCase();
 
       return title.contains(q) || transcript.contains(q);
     }).toList();

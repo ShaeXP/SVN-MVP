@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/utils/preview_mode_detector.dart';
 import './supabase_service.dart';
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 
 class SummaryBackendService {
   static SummaryBackendService? _instance;
@@ -24,7 +25,7 @@ class SummaryBackendService {
   /// Fetch note run by ID
   Future<Map<String, dynamic>?> getNoteRun(String runId) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock get note run');
+      debugPrint('ðŸŽ­ Preview mode: Mock get note run');
       return {
         'id': runId,
         'status': 'summarized',
@@ -59,7 +60,7 @@ class SummaryBackendService {
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
       final response =
           await client.from('note_runs').select().eq('id', runId).single();
 
@@ -73,7 +74,7 @@ class SummaryBackendService {
   /// Get run events for a specific run_id
   Future<List<Map<String, dynamic>>> getRunEvents(String runId) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock get run events');
+      debugPrint('ðŸŽ­ Preview mode: Mock get run events');
       return [
         {
           'id': 1,
@@ -115,7 +116,7 @@ class SummaryBackendService {
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
       final response = await client
           .from('run_events')
           .select()
@@ -132,12 +133,12 @@ class SummaryBackendService {
   /// Subscribe to real-time changes for run_events
   Stream<Map<String, dynamic>> subscribeToRunEvents(String runId) {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock run events subscription');
+      debugPrint('ðŸŽ­ Preview mode: Mock run events subscription');
       return Stream.empty();
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
       return client
           .from('run_events')
           .stream(primaryKey: ['id'])
@@ -154,12 +155,12 @@ class SummaryBackendService {
   /// Subscribe to real-time changes for note_runs
   Stream<Map<String, dynamic>> subscribeToNoteRun(String runId) {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock note run subscription');
+      debugPrint('ðŸŽ­ Preview mode: Mock note run subscription');
       return Stream.empty();
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
       return client
           .from('note_runs')
           .stream(primaryKey: ['id'])
@@ -176,7 +177,7 @@ class SummaryBackendService {
   /// Call sv_summarize_run edge function
   Future<Map<String, dynamic>?> callSummarizeRun(String runId) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock summarize run');
+      debugPrint('ðŸŽ­ Preview mode: Mock summarize run');
       return {
         'success': true,
         'summary': {
@@ -198,7 +199,7 @@ class SummaryBackendService {
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
       final user = client.auth.currentUser;
       if (user == null) throw Exception('No authenticated user');
 
@@ -228,7 +229,7 @@ class SummaryBackendService {
   Future<Map<String, dynamic>?> callSummarizeTranscript(
       String transcriptText) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock summarize transcript');
+      debugPrint('ðŸŽ­ Preview mode: Mock summarize transcript');
       return {
         'summary':
             'Preview mode: This would be an AI-generated summary of the provided transcript text.',
@@ -237,7 +238,7 @@ class SummaryBackendService {
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       final response = await http.post(
         Uri.parse(_summarizeTranscriptUrl),
@@ -264,12 +265,12 @@ class SummaryBackendService {
   /// Get signed download URL for audio
   Future<String?> getSignedAudioDownloadUrl(String storagePath) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock signed audio download URL');
+      debugPrint('ðŸŽ­ Preview mode: Mock signed audio download URL');
       return 'https://preview-mock.supabase.co/storage/v1/object/sign/recordings/preview-audio.webm?token=preview-token';
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       final response = await http.post(
         Uri.parse(_svSignAudioDownloadUrl),
@@ -349,12 +350,12 @@ class SummaryBackendService {
     String? summary,
   }) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock create transcript entry');
+      debugPrint('ðŸŽ­ Preview mode: Mock create transcript entry');
       return 'preview-transcript-${DateTime.now().millisecondsSinceEpoch}';
     }
 
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
       final user = client.auth.currentUser;
       if (user == null) throw Exception('No authenticated user');
 

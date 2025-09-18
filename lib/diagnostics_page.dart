@@ -32,7 +32,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
       setState(() => _asr = 'Missing ASR key');
       return;
     }
-    setState(() => _asr = 'Pinging…');
+    setState(() => _asr = 'Pingingâ€¦');
 
     try {
       final audio = await http.readBytes(Uri.parse(
@@ -41,10 +41,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
       if (dg != null && dg.isNotEmpty) {
         final r = await http.post(
           Uri.parse('https://api.deepgram.com/v1/listen?smart_format=true'),
-          headers: {
-            'Authorization': 'Token $dg',
-            'Content-Type': 'audio/mpeg'
-          },
+          headers: {'Authorization': 'Token $dg', 'Content-Type': 'audio/mpeg'},
           body: audio,
         );
         setState(() => _asr = r.statusCode < 300
@@ -74,7 +71,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
       setState(() => _llm = 'Missing LLM key');
       return;
     }
-    setState(() => _llm = 'Pinging…');
+    setState(() => _llm = 'Pingingâ€¦');
 
     try {
       final isOpenAI = oa != null && oa.isNotEmpty;
@@ -106,8 +103,8 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
         setState(() => _llm = 'ERR ${r.statusCode}: ${r.body}');
       } else {
         final ok = r.body.toLowerCase().contains('pong');
-        setState(() =>
-            _llm = ok ? 'OK in ${sw.elapsedMilliseconds} ms' : 'Unexpected response');
+        setState(() => _llm =
+            ok ? 'OK in ${sw.elapsedMilliseconds} ms' : 'Unexpected response');
       }
     } catch (e) {
       setState(() => _llm = 'Error: $e');
@@ -123,7 +120,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ENV: ${Env.appEnv} • max=${Env.maxSummaryTokens}'),
+            Text('ENV: ${Env.appEnv} â€¢ max=${Env.maxSummaryTokens}'),
             const SizedBox(height: 12),
             _Row(label: 'Network', value: _net, onTap: _online),
             const SizedBox(height: 12),
@@ -142,7 +139,10 @@ class _Row extends StatelessWidget {
   final String value;
   final Future<void> Function() onTap;
   const _Row(
-      {required this.label, required this.value, required this.onTap, super.key});
+      {required this.label,
+      required this.value,
+      required this.onTap,
+      super.key});
   @override
   Widget build(BuildContext context) {
     return Row(

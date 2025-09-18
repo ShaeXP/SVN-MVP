@@ -1,7 +1,9 @@
 // lib/services/pipeline.dart
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import 'package:flutter/foundation.dart'; // for debugPrint
 
 /// Production pipeline wired to your Edge Functions:
 /// - sv_init_note_run
@@ -11,10 +13,10 @@ import '../services/supabase_service.dart';
 ///
 /// Uploads audio directly to Storage, updates DB, then invokes ASR.
 class Pipeline {
-  // ── Configure to match your project ─────────────────────────────────────────
+  // â”€â”€ Configure to match your project â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   static const String bucket = 'recordings'; // your Storage bucket
   static const String runsTable = 'note_runs'; // your Postgres table
-  // ────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Edge Function names (from your list)
   static const String _fnInitRun = 'sv_init_note_run';
@@ -23,27 +25,34 @@ class Pipeline {
   static const String _fnListRuns = 'sv_list_runs';
   static const String _fnGetRun = 'sv_get_run';
 
-  final SupabaseClient _sp = SupabaseService.instance.client;
+  final SupabaseClient _sp = Supa.client;
 
-  // ── Primary flow ────────────────────────────────────────────────────────────
+  // â”€â”€ Primary flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// 1) Create a run row via edge function; returns run id.
-  Future<String> initRun({String? title}) async {
-    final user = _sp.auth.currentUser;
-    if (user == null) throw Exception('Not signed in.');
+  Future<String> initRun() async {
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'sv_init_note_run',
+        body: const {}, // keep whatever you were sending
+      );
 
-    final res = await _invoke(
-      _fnInitRun,
-      body: {if (title != null && title.isNotEmpty) 'title': title},
-    );
+      debugPrint('sv_init_note_run status=${res.status}');
+      debugPrint(
+          'sv_init_note_run data=${res.data}'); // <-- we need to see this
 
-    final data = res.data;
-    if (data is Map) {
-      final id = (data['run_id'] ?? data['id'] ?? data['runId'] ?? data['uuid'])
-          ?.toString();
-      if (id != null && id.isNotEmpty) return id;
+      final data = (res.data is Map) ? res.data as Map : const {};
+      final runId = (data['run_id'] ?? data['id'] ?? data['runId'])?.toString();
+
+      if (runId == null || runId.isEmpty) {
+        throw Exception(
+            'sv_init_note_run returned no run id. Raw: ${res.data}');
+      }
+      return runId;
+    } catch (e, st) {
+      debugPrint('initRun error: $e\n$st');
+      rethrow;
     }
-    throw Exception('sv_init_note_run returned no run id.');
   }
 
   /// 2) Upload audio bytes to Storage. Returns public URL if bucket is public,
@@ -102,7 +111,7 @@ class Pipeline {
     await _sp.from(runsTable).update({'status': 'processing'}).eq('id', runId);
   }
 
-  // ── Convenience for library/details ─────────────────────────────────────────
+  // â”€â”€ Convenience for library/details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<List<Map<String, dynamic>>> listRuns({int limit = 50}) async {
     final res = await _invoke(_fnListRuns, body: {'limit': limit});
@@ -121,7 +130,7 @@ class Pipeline {
     return null;
   }
 
-  // ── Internal helpers ────────────────────────────────────────────────────────
+  // â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<FunctionResponse> _invoke(String fn,
       {Map<String, dynamic>? body}) async {

@@ -1,3 +1,5 @@
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,8 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 
-final supabase = Supabase.instance.client;
+final supabase = Supa.client;
 
 const EDGE_FUNCTION_URL =
     'https://gnskowrijoouemlptrvr.functions.supabase.co/deepgram-transcribe';
@@ -214,7 +217,8 @@ class _SupabaseTranscriptionTestScreenState
       child: ElevatedButton(
         onPressed: isProcessing ? null : handlePickAndTranscribe,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isProcessing ? appTheme.gray_500 : appTheme.blue_A700,
+          backgroundColor:
+              isProcessing ? appTheme.gray_500 : appTheme.blue_A700,
           foregroundColor: appTheme.white_A700,
           padding: EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
@@ -231,7 +235,8 @@ class _SupabaseTranscriptionTestScreenState
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(appTheme.white_A700),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(appTheme.white_A700),
                 ),
               ),
               SizedBox(width: 12.h),

@@ -1,3 +1,5 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:get/get.dart';
 import '../../../core/app_export.dart';
 
 class WelcomeController extends GetxController {
@@ -11,16 +13,16 @@ class WelcomeController extends GetxController {
     super.onReady();
   }
 
-  // btn_register → Voice Recording Home
+  // btn_register â†’ Voice Recording Home
   void onGetStartedPressed() {
     // Navigate to Voice Recording Home (Home Screen) as specified
-    Get.toNamed(AppRoutes.homeScreen);
+    Get.toNamed(Routes.homeScreen);
   }
 
-  // btn_loginRedirect → User Sign In
+  // btn_loginRedirect â†’ User Sign In
   void onSignInPressed() {
     // Navigate to User Sign In (Login Screen) as specified
-    Get.toNamed(AppRoutes.loginScreen);
+    Get.toNamed(Routes.loginScreen);
   }
 
   @override

@@ -1,3 +1,7 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
@@ -25,73 +29,73 @@ class AppNavigationScreen extends GetWidget<AppNavigationController> {
                         context,
                         screenTitle: "Home_paused",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.recordingPausedScreen),
+                            context, Routes.recordingPausedScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Home_ready",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.recordingReadyScreen),
+                            context, Routes.recordingReadyScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Home_recording",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.activeRecordingScreen),
+                            context, Routes.activeRecordingScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Summary",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.recordingSummaryScreen),
+                            context, Routes.recordingSummaryScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Register",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.welcomeScreen),
+                            onTapScreenTitle(context, Routes.loginScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Home_idle",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.homeScreen),
+                            onTapScreenTitle(context, Routes.homeScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Recording_options",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.recordingControlScreen),
+                            context, Routes.activeRecordingScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Recording_success",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.recordingSuccessScreen),
+                            context, Routes.recordingSuccessScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Login Success",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.loginSuccessScreen),
+                            context, Routes.loginSuccessScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Login",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.loginScreen),
+                            onTapScreenTitle(context, Routes.loginScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Library",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.recordingLibraryScreen),
+                            context, Routes.recordingLibraryScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Account",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.settingsScreen),
+                            onTapScreenTitle(context, Routes.settingsScreen),
                       ),
                     ],
                   ),

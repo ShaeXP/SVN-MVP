@@ -1,6 +1,8 @@
-export 'package:get/get.dart';
-export '../routes/app_routes.dart';
-export '../theme/theme_helper.dart';
-export '../theme/text_style_helper.dart';
-export 'utils/image_constant.dart';
-export 'utils/size_utils.dart';
+export "../app/routes/app_routes.dart";
+export "../app/routes/app_pages.dart";
+
+export "../core/utils/size_utils.dart";
+export "../theme/app_theme.dart";
+export "../theme/theme_helper.dart";
+export "../theme/custom_text_style.dart";
+export "../core/utils/image_constant.dart";

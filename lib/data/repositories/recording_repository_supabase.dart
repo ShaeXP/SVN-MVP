@@ -3,6 +3,7 @@ import 'dart:io';
 import '../../services/supabase_service.dart';
 import '../models/recording_item.dart';
 import './recording_repository.dart';
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 
 class RecordingRepositorySupabase implements RecordingRepository {
   static final RecordingRepositorySupabase _instance =
@@ -15,7 +16,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<void> upsertMetadata(RecordingItem item) async {
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       // Map plain RecordingItem to Supabase row using plain Strings/Lists
       await client.from('recordings').upsert(item.toSupabaseRecording());
@@ -58,7 +59,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<String> uploadAudio(String recordingId, File audioFile) async {
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       // Plain String parameters only
       final filePath =
@@ -78,7 +79,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<List<RecordingItem>> fetchAll() async {
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       // Fetch recordings with related notes
       final response = await client.from('recordings').select('''
@@ -109,7 +110,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<void> delete(String id) async {
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       // Plain String parameter only
       await client.from('notes').delete().eq('recording_id', id);
@@ -137,7 +138,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<RecordingItem?> getById(String id) async {
     try {
-      final client = SupabaseService.instance.client;
+      final client = Supa.client;
 
       final response = await client.from('recordings').select('''
             id,

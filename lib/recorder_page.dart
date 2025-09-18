@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'bootstrap_supabase.dart';
-import 'services/recorder_service.dart';
-import 'services/supabase_upload.dart';
-import 'services/playback_service.dart';
+
+import 'package:lashae_s_application/bootstrap_supabase.dart';
+import 'package:lashae_s_application/services/recorder_service.dart';
+import 'package:lashae_s_application/services/supabase_upload.dart';
+import 'package:lashae_s_application/services/playback_service.dart';
 
 class RecorderPage extends StatefulWidget {
   const RecorderPage({super.key});
@@ -28,8 +29,8 @@ class _RecorderPageState extends State<RecorderPage> {
   String? _authMsg;
 
   // Last recording state
-  String? _lastLocalPath;     // e.g., C:\...\svn_123.wav
-  String? _lastStoragePath;   // e.g., user/<uid>/<run_id>.wav
+  String? _lastLocalPath; // e.g., C:\...\svn_123.wav
+  String? _lastStoragePath; // e.g., user/<uid>/<run_id>.wav
   String? _lastRunId;
 
   // Recent list state
@@ -57,7 +58,8 @@ class _RecorderPageState extends State<RecorderPage> {
       if (email.isEmpty || pw.isEmpty) {
         throw Exception('Enter email and password');
       }
-      final resp = await Supa.client.auth.signInWithPassword(email: email, password: pw);
+      final resp =
+          await Supa.client.auth.signInWithPassword(email: email, password: pw);
       if (resp.user == null) throw Exception('Sign-in failed');
       setState(() => _authMsg = 'Signed in as ${resp.user!.email}');
       await _refreshList();
@@ -73,7 +75,11 @@ class _RecorderPageState extends State<RecorderPage> {
   }
 
   Future<void> _start() async {
-    setState(() { _error = null; _result = null; _status = 'starting'; });
+    setState(() {
+      _error = null;
+      _result = null;
+      _status = 'starting';
+    });
     try {
       await _ensureLoggedIn();
       final ok = await _rec.isAvailable();
@@ -82,7 +88,10 @@ class _RecorderPageState extends State<RecorderPage> {
       _startTimer();
       setState(() => _status = 'recording');
     } catch (e) {
-      setState(() { _status = 'idle'; _error = e.toString(); });
+      setState(() {
+        _status = 'idle';
+        _error = e.toString();
+      });
     }
   }
 
@@ -107,7 +116,10 @@ class _RecorderPageState extends State<RecorderPage> {
 
       await _refreshList();
     } catch (e) {
-      setState(() { _status = 'idle'; _error = e.toString(); });
+      setState(() {
+        _status = 'idle';
+        _error = e.toString();
+      });
     }
   }
 
@@ -137,7 +149,10 @@ class _RecorderPageState extends State<RecorderPage> {
 
   Future<void> _deleteLast() async {
     try {
-      setState(() { _error = null; _result = null; });
+      setState(() {
+        _error = null;
+        _result = null;
+      });
       final rid = _lastRunId;
       final sp = _lastStoragePath;
       if (rid == null || sp == null) throw Exception('Nothing to delete.');
@@ -245,7 +260,8 @@ class _RecorderPageState extends State<RecorderPage> {
             const Divider(height: 32),
 
             // Auth (dev-only)
-            Text('Auth (testing only)', style: Theme.of(context).textTheme.titleMedium),
+            Text('Auth (testing only)',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text('Current user: ${user?.email ?? "(none)"}'),
             const SizedBox(height: 8),
@@ -268,7 +284,8 @@ class _RecorderPageState extends State<RecorderPage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                ElevatedButton(onPressed: _signIn, child: const Text('Sign in')),
+                ElevatedButton(
+                    onPressed: _signIn, child: const Text('Sign in')),
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: () async {
@@ -293,14 +310,16 @@ class _RecorderPageState extends State<RecorderPage> {
             if (_authMsg != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(_authMsg!, style: const TextStyle(color: Colors.blueGrey)),
+                child: Text(_authMsg!,
+                    style: const TextStyle(color: Colors.blueGrey)),
               ),
 
             const Divider(height: 32),
 
             Row(
               children: [
-                Text('My recent recordings', style: Theme.of(context).textTheme.titleMedium),
+                Text('My recent recordings',
+                    style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(width: 12),
                 if (_loadingList) const Text('Loading...'),
               ],
@@ -318,8 +337,9 @@ class _RecorderPageState extends State<RecorderPage> {
                   final status = (r['status'] as String?) ?? 'uploaded';
                   return ListTile(
                     dense: true,
-                    title: Text(runId, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('$path  —  ${secs}s  •  $status'),
+                    title: Text(runId,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text('$path  â€”  ${secs}s  â€¢  $status'),
                     trailing: Wrap(
                       spacing: 8,
                       children: [
@@ -338,7 +358,8 @@ class _RecorderPageState extends State<RecorderPage> {
                           tooltip: 'Delete',
                           onPressed: () async {
                             setState(() => _error = null);
-                            await SupaUpload.deleteRecording(runId: runId, storagePath: path);
+                            await SupaUpload.deleteRecording(
+                                runId: runId, storagePath: path);
                             await _refreshList();
                           },
                           icon: const Icon(Icons.delete),

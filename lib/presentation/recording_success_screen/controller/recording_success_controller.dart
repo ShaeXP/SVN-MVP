@@ -1,3 +1,6 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:get/get.dart';
 import 'dart:io';
 
 import '../../../core/app_export.dart';
@@ -23,7 +26,7 @@ class RecordingSuccessController extends GetxController {
     super.onReady();
   }
 
-  /// btn_goToSummary → Recording Summary Screen with transcript_id
+  /// btn_goToSummary â†’ Recording Summary Screen with transcript_id
   void onGoToSummaryPressed() async {
     if (isProcessing.value) return;
 
@@ -36,13 +39,13 @@ class RecordingSuccessController extends GetxController {
         backgroundColor: appTheme.red_400,
         colorText: appTheme.white_A700,
       );
-      Get.toNamed(AppRoutes.recordingLibraryScreen);
+      Get.toNamed(Routes.recordingLibraryScreen);
       return;
     }
 
     // Navigate to Recording Summary Screen with transcript_id
     Get.toNamed(
-      AppRoutes.recordingSummaryScreen,
+      Routes.recordingSummaryScreen,
       arguments: {'transcript_id': transcriptId},
     );
   }
@@ -53,15 +56,15 @@ class RecordingSuccessController extends GetxController {
     switch (index) {
       case 0:
         // Record tab
-        Get.toNamed(AppRoutes.homeScreen);
+        Get.toNamed(Routes.homeScreen);
         break;
       case 1:
         // Library tab
-        Get.toNamed(AppRoutes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibraryScreen);
         break;
       case 2:
         // Account tab
-        Get.toNamed(AppRoutes.settingsScreen);
+        Get.toNamed(Routes.settingsScreen);
         break;
     }
   }

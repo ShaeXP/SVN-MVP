@@ -1,3 +1,6 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
@@ -18,7 +21,7 @@ class RecordingReadyScreen extends GetWidget<RecordingReadyController> {
       child: Scaffold(
         body: Navigator(
           key: Get.nestedKey(1),
-          initialRoute: AppRoutes.recordingReadyScreenInitialPage,
+          initialRoute: Routes.recordingReadyScreenInitialPage,
           onGenerateRoute: (routeSetting) => GetPageRoute(
             page: () => getCurrentPage(routeSetting.name!),
             transition: Transition.noTransition,
@@ -47,23 +50,23 @@ class RecordingReadyScreen extends GetWidget<RecordingReadyController> {
   String _getRouteForIndex(int index) {
     switch (index) {
       case 0:
-        return AppRoutes.recordingReadyScreenInitialPage;
+        return Routes.recordingReadyScreenInitialPage;
       case 1:
-        return AppRoutes.recordingLibraryScreen;
+        return Routes.recordingLibraryScreen;
       case 2:
-        return AppRoutes.settingsScreen;
+        return Routes.settingsScreen;
       default:
-        return AppRoutes.recordingReadyScreenInitialPage;
+        return Routes.recordingReadyScreenInitialPage;
     }
   }
 
   Widget getCurrentPage(String currentRoute) {
     switch (currentRoute) {
-      case AppRoutes.recordingReadyScreenInitialPage:
+      case Routes.recordingReadyScreenInitialPage:
         return RecordingReadyScreenInitialPage();
-      case AppRoutes.recordingLibraryScreen:
+      case Routes.recordingLibraryScreen:
         return RecordingLibraryScreen();
-      case AppRoutes.settingsScreen:
+      case Routes.settingsScreen:
         return SettingsScreen();
       default:
         return RecordingReadyScreenInitialPage();

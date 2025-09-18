@@ -1,3 +1,5 @@
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
@@ -84,8 +86,8 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
                     Obx(() => _buildInfoRow(
                           'main() Executed:',
                           controller.mainExecuted.value
-                              ? '✅ SUCCESS'
-                              : '❌ FAILED',
+                              ? 'âœ… SUCCESS'
+                              : 'âŒ FAILED',
                         )),
 
                     SizedBox(height: 8.0),

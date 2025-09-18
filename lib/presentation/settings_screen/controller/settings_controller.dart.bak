@@ -1,0 +1,268 @@
+import '../../../app/routes/app_routes.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
+import '../models/setting_item_model.dart';
+import '../models/settings_model.dart';
+
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+class SettingsController extends GetxController {
+  Rx<SettingsModel> settingsModelObj = SettingsModel().obs;
+  RxList<SettingItemModel> additionalSettings = <SettingItemModel>[].obs;
+
+  // Long press timer for hidden screen access
+  Timer? _longPressTimer;
+  final RxInt _longPressDuration = 0.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initializeAdditionalSettings();
+    _loadUserProfile();
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+  }
+
+  @override
+  void onClose() {
+    _longPressTimer?.cancel();
+    super.onClose();
+  }
+
+  void _initializeAdditionalSettings() {
+    additionalSettings.value = [
+      SettingItemModel(
+        iconPath: ImageConstant.imgContainer.obs,
+        backgroundColor: '#19a855f7'.obs,
+        title: 'Audio Settings'.obs,
+        subtitle: 'Quality: Low Quality â€¢ Sensitivity: Normal'.obs,
+      ),
+      SettingItemModel(
+        iconPath: ImageConstant.imgContainerBlueA700.obs,
+        backgroundColor: '#193b82f6'.obs,
+        title: 'Teams'.obs,
+        subtitle: 'Manage team members and permissions'.obs,
+      ),
+      SettingItemModel(
+        iconPath: ImageConstant.imgIconBilling.obs,
+        backgroundColor: '#196366f1'.obs,
+        title: 'Billing & Usage'.obs,
+        subtitle: 'Manage your subscription and usage'.obs,
+      ),
+    ];
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await SupabaseService.instance.getUserProfile();
+      if (profile != null) {
+        settingsModelObj.value.userName?.value =
+            profile['full_name'] ?? 'Unknown User';
+        settingsModelObj.value.userEmail?.value =
+            profile['email'] ?? 'No email';
+        settingsModelObj.value.userId?.value =
+            'ID: ${profile['id'].toString().substring(0, 8)}...';
+      }
+    } catch (error) {
+      Get.snackbar(
+        'Error',
+        'Failed to load user profile: $error',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: appTheme.red_400,
+        colorText: appTheme.white_A700,
+      );
+    }
+  }
+
+  // 2-second long press handler for accessing hidden screen
+  void onAppLogoLongPress() {
+    _longPressDuration.value = 0;
+
+    // Show progress indicator
+    Get.dialog(
+      Dialog(
+        child: Container(
+          padding: EdgeInsets.all(20.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Hold for 2 seconds to access hidden screen',
+                style: TextStyleHelper.instance.body14RegularOpenSans,
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16.h),
+              Obx(() => LinearProgressIndicator(
+                    value: _longPressDuration.value / 20.0,
+                    backgroundColor: appTheme.gray_300,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(appTheme.blue_200_01),
+                  )),
+              SizedBox(height: 16.h),
+              TextButton(
+                onPressed: () {
+                  _longPressTimer?.cancel();
+                  Get.back();
+                },
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+
+    // Start timer for 2 seconds
+    _longPressTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      _longPressDuration.value += 1;
+
+      if (_longPressDuration.value >= 20) {
+        timer.cancel();
+        Get.back(); // Close progress dialog
+
+        // Navigate to hidden screen
+        Get.toNamed(Routes.recordingReadyScreenInitialPage);
+
+        Get.snackbar(
+          'Hidden Screen Access',
+          'Welcome to the developer screen!',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: appTheme.teal_600,
+          colorText: appTheme.white_A700,
+        );
+      }
+    });
+  }
+
+  void onAppearanceTap() {
+    Get.snackbar(
+      'Appearance',
+      'Theme settings will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onAIPreferencesTap() {
+    Get.snackbar(
+      'AI Preferences',
+      'AI settings will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onNotificationsTap() {
+    Get.snackbar(
+      'Notifications',
+      'Notification settings will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onEditProfileTap() {
+    Get.snackbar(
+      'Edit Profile',
+      'Profile editing will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onSignOutPressed() async {
+    try {
+      await SupabaseService.instance.signOut();
+
+      Get.snackbar(
+        'Success',
+        'You have been signed out successfully',
+        backgroundColor: appTheme.green_600,
+        colorText: appTheme.white_A700,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      // Navigate to User Sign In (Login Screen) as specified
+      Get.offAllNamed(Routes.loginScreen);
+    } catch (error) {
+      Get.snackbar(
+        'Error',
+        'Failed to sign out. Please try again.',
+        backgroundColor: appTheme.red_400,
+        colorText: appTheme.white_A700,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  void onAdditionalSettingTap(int index) {
+    final setting = additionalSettings[index];
+    Get.snackbar(
+      setting.title?.value ?? '',
+      'This setting will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onExportPreferencesTap() {
+    Get.snackbar(
+      'Export Preferences',
+      'Export settings will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onPrivacySecurityTap() {
+    Get.snackbar(
+      'Privacy & Security',
+      'Privacy settings will open here',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void onResetToDefaultsTap() {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Reset Settings'),
+        content: Text(
+            'Are you sure you want to reset all settings to their default values? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              _resetAllSettings();
+              Get.snackbar(
+                'Settings Reset',
+                'All settings have been restored to default values',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: appTheme.teal_600,
+                colorText: appTheme.white_A700,
+              );
+            },
+            child: Text('Reset',
+                style: TextStyleHelper.instance.body14RegularOpenSans
+                    .copyWith(color: appTheme.red_400)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _resetAllSettings() {
+    settingsModelObj.value = SettingsModel();
+    _initializeAdditionalSettings();
+  }
+}
+
+
+

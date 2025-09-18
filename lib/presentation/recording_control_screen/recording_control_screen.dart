@@ -1,3 +1,7 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -115,7 +119,7 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
 
       // Navigate to active recording screen with startedAt timestamp
       Get.toNamed(
-        AppRoutes.activeRecordingScreen,
+        Routes.activeRecordingScreen,
         arguments: {'startedAt': DateTime.now().toIso8601String()},
       );
     } catch (e) {
@@ -138,12 +142,12 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
     _clearError();
 
     // Navigate back to recording control in idle state
-    Get.offNamed(AppRoutes.recordingControlScreen);
+    Get.offNamed(Routes.recordingControlScreen);
   }
 
   /// Save action with gating
   Future<void> _onSave() async {
-    // Guard: if file null or duration 0 → error banner, return
+    // Guard: if file null or duration 0 â†’ error banner, return
     if (_audioFile == null || (_elapsed.inMilliseconds == 0)) {
       _showError('No recording data. Please record first.');
       return;
@@ -410,13 +414,13 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
 
     switch (index) {
       case 0:
-        Get.toNamed(AppRoutes.homeScreen);
+        Get.toNamed(Routes.homeScreen);
         break;
       case 1:
-        Get.toNamed(AppRoutes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibraryScreen);
         break;
       case 2:
-        Get.toNamed(AppRoutes.settingsScreen);
+        Get.toNamed(Routes.settingsScreen);
         break;
     }
   }

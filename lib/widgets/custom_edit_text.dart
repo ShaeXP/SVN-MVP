@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-
-import '../core/app_export.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:lashae_s_application/theme/app_theme.dart';
+import 'package:lashae_s_application/theme/custom_text_style.dart';
 
 /**
  * CustomEditText - A reusable text input field component

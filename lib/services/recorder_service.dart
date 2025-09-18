@@ -7,7 +7,8 @@ class RecorderResult {
   final File file;
   final Duration duration;
   final String mime; // 'audio/wav' on Windows, 'audio/m4a' elsewhere
-  RecorderResult({required this.file, required this.duration, required this.mime});
+  RecorderResult(
+      {required this.file, required this.duration, required this.mime});
 }
 
 class RecorderService {
@@ -33,7 +34,8 @@ class RecorderService {
 
     final recordConfig = isWindows
         ? const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 44100)
-        : const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
+        : const RecordConfig(
+            encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
 
     await _recorder.start(recordConfig, path: outFile.path);
   }
@@ -45,8 +47,13 @@ class RecorderService {
     final started = _startedAt ?? DateTime.now();
     final dur = DateTime.now().difference(started);
     final isWav = path.toLowerCase().endsWith('.wav');
-    return RecorderResult(file: f, duration: dur, mime: isWav ? 'audio/wav' : 'audio/m4a');
+    return RecorderResult(
+        file: f, duration: dur, mime: isWav ? 'audio/wav' : 'audio/m4a');
   }
 
-  Future<void> dispose() async { try { await _recorder.dispose(); } catch (_) {} }
+  Future<void> dispose() async {
+    try {
+      await _recorder.dispose();
+    } catch (_) {}
+  }
 }

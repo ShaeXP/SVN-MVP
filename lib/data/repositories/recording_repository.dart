@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../models/recording_item.dart';
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 
 abstract class RecordingRepository {
   /// Upsert recording metadata - takes plain RecordingItem

@@ -1,3 +1,5 @@
+import 'package:lashae_s_application/core/app_export.dart';
+
 // lib/core/utils/image_constant.dart
 class ImageConstant {
   // Base path for all assets

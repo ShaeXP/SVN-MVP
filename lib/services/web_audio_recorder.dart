@@ -22,9 +22,12 @@ class WebAudioRecorder {
   int _totalPausedDuration = 0;
 
   // Stream controllers for recording events
-  final StreamController<Duration> _durationController = StreamController<Duration>.broadcast();
-  final StreamController<List<double>> _waveformController = StreamController<List<double>>.broadcast();
-  final StreamController<RecordingState> _stateController = StreamController<RecordingState>.broadcast();
+  final StreamController<Duration> _durationController =
+      StreamController<Duration>.broadcast();
+  final StreamController<List<double>> _waveformController =
+      StreamController<List<double>>.broadcast();
+  final StreamController<RecordingState> _stateController =
+      StreamController<RecordingState>.broadcast();
 
   // Getters for streams
   Stream<Duration> get durationStream => _durationController.stream;
@@ -43,7 +46,7 @@ class WebAudioRecorder {
   Future<bool> startRecording() async {
     try {
       if (_isRecording) {
-        debugPrint('⚠️ Recording already in progress');
+        debugPrint('âš ï¸ Recording already in progress');
         return false;
       }
 
@@ -74,7 +77,7 @@ class WebAudioRecorder {
       });
 
       _mediaRecorder!.addEventListener('start', (_) {
-        debugPrint('🎤 Recording started');
+        debugPrint('ðŸŽ¤ Recording started');
         _isRecording = true;
         _isPaused = false;
         _stateController.add(RecordingState.recording);
@@ -82,7 +85,7 @@ class WebAudioRecorder {
       });
 
       _mediaRecorder!.addEventListener('stop', (_) {
-        debugPrint('⏹️ Recording stopped');
+        debugPrint('â¹ï¸ Recording stopped');
         _isRecording = false;
         _isPaused = false;
         _stateController.add(RecordingState.stopped);
@@ -90,17 +93,18 @@ class WebAudioRecorder {
       });
 
       _mediaRecorder!.addEventListener('pause', (_) {
-        debugPrint('⏸️ Recording paused');
+        debugPrint('â¸ï¸ Recording paused');
         _isPaused = true;
         _pauseStartTime = DateTime.now();
         _stateController.add(RecordingState.paused);
       });
 
       _mediaRecorder!.addEventListener('resume', (_) {
-        debugPrint('▶️ Recording resumed');
+        debugPrint('â–¶ï¸ Recording resumed');
         _isPaused = false;
         if (_pauseStartTime != null) {
-          _totalPausedDuration += DateTime.now().difference(_pauseStartTime!).inMilliseconds;
+          _totalPausedDuration +=
+              DateTime.now().difference(_pauseStartTime!).inMilliseconds;
           _pauseStartTime = null;
         }
         _stateController.add(RecordingState.recording);
@@ -110,7 +114,7 @@ class WebAudioRecorder {
       _mediaRecorder!.start();
       return true;
     } catch (e) {
-      debugPrint('❌ Failed to start recording: $e');
+      debugPrint('âŒ Failed to start recording: $e');
       await _cleanup();
       return false;
     }
@@ -126,7 +130,7 @@ class WebAudioRecorder {
       _mediaRecorder!.pause();
       return true;
     } catch (e) {
-      debugPrint('❌ Failed to pause recording: $e');
+      debugPrint('âŒ Failed to pause recording: $e');
       return false;
     }
   }
@@ -141,7 +145,7 @@ class WebAudioRecorder {
       _mediaRecorder!.resume();
       return true;
     } catch (e) {
-      debugPrint('❌ Failed to resume recording: $e');
+      debugPrint('âŒ Failed to resume recording: $e');
       return false;
     }
   }
@@ -149,20 +153,20 @@ class WebAudioRecorder {
   /// Stop recording and return the recorded audio blob
   Future<Uint8List?> stopRecording() async {
     if (!_isRecording || _mediaRecorder == null) {
-      debugPrint('⚠️ No recording in progress');
+      debugPrint('âš ï¸ No recording in progress');
       return null;
     }
 
     try {
       // Complete the recording
       final completer = Completer<Uint8List?>();
-      
+
       _mediaRecorder!.addEventListener('stop', (_) async {
         try {
           if (_recordedChunks.isNotEmpty) {
             // Create final blob from recorded chunks
             final blob = html.Blob(_recordedChunks, _getSupportedMimeType());
-            
+
             // Convert blob to Uint8List
             final reader = html.FileReader();
             reader.readAsArrayBuffer(blob);
@@ -172,25 +176,25 @@ class WebAudioRecorder {
               completer.complete(uint8List);
             });
             reader.onError.listen((_) {
-              debugPrint('❌ Failed to convert blob to Uint8List');
+              debugPrint('âŒ Failed to convert blob to Uint8List');
               completer.complete(null);
             });
           } else {
             completer.complete(null);
           }
         } catch (e) {
-          debugPrint('❌ Error processing recorded data: $e');
+          debugPrint('âŒ Error processing recorded data: $e');
           completer.complete(null);
         }
       });
 
       _mediaRecorder!.stop();
       final result = await completer.future;
-      
+
       await _cleanup();
       return result;
     } catch (e) {
-      debugPrint('❌ Failed to stop recording: $e');
+      debugPrint('âŒ Failed to stop recording: $e');
       await _cleanup();
       return null;
     }
@@ -204,13 +208,13 @@ class WebAudioRecorder {
 
     final now = DateTime.now();
     final totalDuration = now.difference(_startTime!).inMilliseconds;
-    
+
     // Subtract paused time
     int pausedTime = _totalPausedDuration;
     if (_isPaused && _pauseStartTime != null) {
       pausedTime += now.difference(_pauseStartTime!).inMilliseconds;
     }
-    
+
     return Duration(milliseconds: math.max(0, totalDuration - pausedTime));
   }
 
@@ -218,16 +222,17 @@ class WebAudioRecorder {
   Future<void> _setupAudioAnalysis(html.MediaStream stream) async {
     try {
       _audioContext = js_util.callConstructor(js.context['AudioContext'], []);
-      final source = js_util.callMethod(_audioContext, 'createMediaStreamSource', [stream]);
+      final source = js_util
+          .callMethod(_audioContext, 'createMediaStreamSource', [stream]);
       _analyser = js_util.callMethod(_audioContext, 'createAnalyser', []);
-      
+
       js_util.setProperty(_analyser, 'fftSize', 256);
       js_util.callMethod(source, 'connect', [_analyser]);
 
       // Start waveform analysis
       _startWaveformAnalysis();
     } catch (e) {
-      debugPrint('⚠️ Failed to set up audio analysis: $e');
+      debugPrint('âš ï¸ Failed to set up audio analysis: $e');
       // Continue without waveform - recording will still work
     }
   }
@@ -243,15 +248,17 @@ class WebAudioRecorder {
       }
 
       try {
-        final frequencyBinCount = js_util.getProperty(_analyser, 'frequencyBinCount');
+        final frequencyBinCount =
+            js_util.getProperty(_analyser, 'frequencyBinCount');
         final dataArray = Float32List(frequencyBinCount);
         js_util.callMethod(_analyser, 'getFloatFrequencyData', [dataArray]);
-        
+
         // Convert to simple amplitude values for waveform visualization
         final waveformData = dataArray.take(32).map((value) {
-          return math.max<double>(0.0, math.min<double>(1.0, (value.toDouble() + 100) / 100));
+          return math.max<double>(
+              0.0, math.min<double>(1.0, (value.toDouble() + 100) / 100));
         }).toList();
-        
+
         _waveformController.add(waveformData);
       } catch (e) {
         // Silently continue - waveform is optional
@@ -296,12 +303,12 @@ class WebAudioRecorder {
   Future<void> _cleanup() async {
     try {
       _stopDurationTimer();
-      
+
       _mediaStream?.getTracks().forEach((track) {
         track.stop();
       });
       _mediaStream = null;
-      
+
       if (_audioContext != null) {
         try {
           js_util.callMethod(_audioContext, 'close', []);
@@ -311,7 +318,7 @@ class WebAudioRecorder {
       }
       _audioContext = null;
       _analyser = null;
-      
+
       _mediaRecorder = null;
       _recordedChunks.clear();
       _isRecording = false;
@@ -320,7 +327,7 @@ class WebAudioRecorder {
       _pauseStartTime = null;
       _totalPausedDuration = 0;
     } catch (e) {
-      debugPrint('⚠️ Error during cleanup: $e');
+      debugPrint('âš ï¸ Error during cleanup: $e');
     }
   }
 

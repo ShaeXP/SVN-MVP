@@ -1,3 +1,7 @@
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
@@ -48,10 +52,10 @@ class HomeScreen extends StatelessWidget {
       case 0:
         break; // already on Home
       case 1:
-        Get.toNamed(AppRoutes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibraryScreen);
         break;
       case 2:
-        Get.toNamed(AppRoutes.settingsScreen);
+        Get.toNamed(Routes.settingsScreen);
         break;
     }
   }
@@ -70,7 +74,7 @@ class HomeScreen extends StatelessWidget {
         SizedBox(height: 10.h),
         Text(
           'Your intelligent assistant for voice-to-text notes.',
-          style: Theme.of(context).textTheme.bodyMedium,    // muted body
+          style: Theme.of(context).textTheme.bodyMedium, // muted body
           textAlign: TextAlign.center,
         ),
       ],
@@ -102,7 +106,7 @@ class HomeScreen extends StatelessWidget {
               children: [
                 // Mic
                 GestureDetector(
-                  onTap: () => Get.toNamed(AppRoutes.activeRecordingScreen),
+                  onTap: () => Get.toNamed(Routes.recordingReadyScreenInitialPage),
                   child: Container(
                     height: 96.h,
                     width: 96.h,
@@ -122,7 +126,7 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(width: 24.h),
                 // Upload
                 GestureDetector(
-                  onTap: () => Get.toNamed(AppRoutes.fileUploadScreen),
+                  onTap: () => Get.toNamed(Routes.recordingLibraryScreen),
                   child: Container(
                     height: 96.h,
                     width: 96.h,

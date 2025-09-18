@@ -1,3 +1,7 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
@@ -68,13 +72,13 @@ class RecordingLibraryScreen extends StatelessWidget {
   void _onBottomNavigationChanged(int index) {
     switch (index) {
       case 0:
-        Get.toNamed(AppRoutes.homeScreen);
+        Get.toNamed(Routes.homeScreen);
         break;
       case 1:
         // Already on Recording Library Screen
         break;
       case 2:
-        Get.toNamed(AppRoutes.settingsScreen);
+        Get.toNamed(Routes.settingsScreen);
         break;
     }
   }

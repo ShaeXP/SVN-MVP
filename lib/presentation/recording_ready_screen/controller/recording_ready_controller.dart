@@ -1,3 +1,5 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:get/get.dart';
 import '../../../core/app_export.dart';
 import '../models/recording_ready_model.dart';
 
@@ -25,13 +27,13 @@ class RecordingReadyController extends GetxController {
   void startRecording() {
     isRecording.value = true;
     statusText.value = 'Recording...';
-    Get.toNamed(AppRoutes.activeRecordingScreen);
+    Get.toNamed(Routes.activeRecordingScreen);
   }
 
   void pauseRecording() {
     isRecording.value = false;
     statusText.value = 'Paused';
-    Get.toNamed(AppRoutes.recordingPausedScreen);
+    Get.toNamed(Routes.recordingPausedScreen);
   }
 
   void onStopPressed() {

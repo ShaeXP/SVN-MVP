@@ -1,30 +1,32 @@
+// lib/env.dart
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 
 class Env {
-  static Map<String, dynamic>? _data;
+  /// In-memory store for env.json
+  static Map<String, dynamic> _data = const {};
 
-  /// Loads env.json from assets into memory
+  /// Load assets/config/env.json once at startup
   static Future<void> load() async {
-    final raw = await rootBundle.loadString('env.json');
+    final raw = await rootBundle.loadString('assets/config/env.json');
     _data = json.decode(raw) as Map<String, dynamic>;
   }
 
-  /// Helper to safely fetch values
-  static String? getString(String key) => _data?[key]?.toString();
+  /// Safe getter (returns null if key missing)
+  static String? _get(String key) => _data[key]?.toString();
 
-  /// Example typed getters
-  static String get appEnv => getString('APP_ENV') ?? 'development';
+  // ---- Typed helpers (use keys exactly as in env.json) ----
+  static String get appEnv => _get('APP_ENV') ?? 'development';
 
   static int get maxSummaryTokens =>
-      int.tryParse(getString('MAX_SUMMARY_TOKENS') ?? '600') ?? 600;
+      int.tryParse(_get('MAX_SUMMARY_TOKENS') ?? '') ?? 600;
 
-  static String? get supabaseUrl => getString('SUPABASE_URL');
-  static String? get supabaseAnonKey => getString('SUPABASE_ANON_KEY');
+  static String get supabaseUrl => _get('SUPABASE_URL') ?? '';
 
-  static String? get deepgramKey => getString('DEEPGRAM_API_KEY');
-  static String? get assemblyKey => getString('ASSEMBLYAI_API_KEY');
+  static String get supabaseAnonKey => _get('SUPABASE_ANON_KEY') ?? '';
 
-  static String? get openaiKey => getString('OPENAI_API_KEY');
-  static String? get openrouterKey => getString('OPENROUTER_API_KEY');
+  static String get deepgramKey => _get('DEEPGRAM_API_KEY') ?? '';
+  static String get assemblyKey => _get('ASSEMBLYAI_API_KEY') ?? '';
+  static String get openaiKey => _get('OPENAI_API_KEY') ?? '';
+  static String get openrouterKey => _get('OPENROUTER_API_KEY') ?? '';
 }

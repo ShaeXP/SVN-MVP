@@ -1,4 +1,9 @@
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
+// lib/presentation/login_screen/login_screen.dart
 import 'package:flutter/material.dart';
+import 'package:lashae_s_application/widgets/session_debug_overlay.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -13,54 +18,59 @@ class LoginScreen extends GetWidget<LoginController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: appTheme.whiteCustom,
-      body: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: appTheme.color281E12,
-              offset: Offset(0, 3.h),
-              blurRadius: 6.h,
-              spreadRadius: 0,
+      appBar: AppBar(title: const Text('Recorder')),
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: appTheme.color281E12,
+                  offset: Offset(0, 3.h),
+                  blurRadius: 6.h,
+                  spreadRadius: 0,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            CustomAppBar(
-              leadingImagePath: ImageConstant.imgGroup,
-              trailingImagePath: ImageConstant.imgGroupGray900,
-              centerLogoImagePath: ImageConstant.imgImgLogomic54x68,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(22.h, 32.h, 22.h, 0),
-                  child: Column(
-                    children: [
-                      _buildLoginForm(),
-                      SizedBox(height: 24.h),
-                      _buildTryDemoSection(),
-                      SizedBox(height: 14.h),
-                      _buildDemoAccountInfo(),
-                      SizedBox(height: 32.h),
-                      _buildOrContinueWithSection(),
-                      SizedBox(height: 32.h),
-                      _buildGoogleButton(),
-                      SizedBox(height: 16.h),
-                      _buildMicrosoftButton(),
-                      SizedBox(height: 40.h),
-                      _buildCreateAccountSection(),
-                      SizedBox(height: 38.h),
-                      _buildSecuritySection(),
-                      SizedBox(height: 44.h),
-                    ],
+            child: Column(
+              children: [
+                CustomAppBar(
+                  leadingImagePath: ImageConstant.imgGroup,
+                  trailingImagePath: ImageConstant.imgGroupGray900,
+                  centerLogoImagePath: ImageConstant.imgImgLogomic54x68,
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(22.h, 32.h, 22.h, 0),
+                      child: Column(
+                        children: [
+                          _buildLoginForm(),
+                          SizedBox(height: 24.h),
+                          _buildTryDemoSection(),
+                          SizedBox(height: 14.h),
+                          _buildDemoAccountInfo(),
+                          SizedBox(height: 32.h),
+                          _buildOrContinueWithSection(),
+                          SizedBox(height: 32.h),
+                          _buildGoogleButton(),
+                          SizedBox(height: 16.h),
+                          _buildMicrosoftButton(),
+                          SizedBox(height: 40.h),
+                          _buildCreateAccountSection(),
+                          SizedBox(height: 38.h),
+                          _buildSecuritySection(),
+                          SizedBox(height: 44.h),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SessionDebugOverlay(),
+        ],
       ),
     );
   }
@@ -144,19 +154,21 @@ class LoginScreen extends GetWidget<LoginController> {
               ),
             ),
             SizedBox(height: 14.h),
-            Obx(() => CustomButton(
-                  text: 'Sign In',
-                  onPressed: controller.isLoading.value
-                      ? null
-                      : () => controller.onSignInTap(),
-                  backgroundColor: appTheme.blue_200_01,
-                  textColor: appTheme.cyan_900,
-                  borderRadius: 10,
-                  variant: CustomButtonVariant.filled,
-                  elevation: 1,
-                  fontSize: 16.fSize,
-                  fontWeight: FontWeight.w600,
-                )),
+            Obx(
+              () => CustomButton(
+                text: 'Sign In',
+                onPressed: controller.isLoading.value
+                    ? null
+                    : () => controller.onSignInTap(),
+                backgroundColor: appTheme.blue_200_01,
+                textColor: appTheme.cyan_900,
+                borderRadius: 10,
+                variant: CustomButtonVariant.filled,
+                elevation: 1,
+                fontSize: 16.fSize,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -232,12 +244,7 @@ class LoginScreen extends GetWidget<LoginController> {
   Widget _buildOrContinueWithSection() {
     return Row(
       children: [
-        Expanded(
-          child: Container(
-            height: 1.h,
-            color: appTheme.gray_300,
-          ),
-        ),
+        Expanded(child: Container(height: 1.h, color: appTheme.gray_300)),
         SizedBox(width: 16.h),
         Text(
           'Or continue with',
@@ -245,12 +252,7 @@ class LoginScreen extends GetWidget<LoginController> {
               .copyWith(color: appTheme.gray_700, height: 1.43),
         ),
         SizedBox(width: 16.h),
-        Expanded(
-          child: Container(
-            height: 1.h,
-            color: appTheme.gray_300,
-          ),
-        ),
+        Expanded(child: Container(height: 1.h, color: appTheme.gray_300)),
       ],
     );
   }
@@ -481,7 +483,7 @@ class LoginScreen extends GetWidget<LoginController> {
                   style: TextStyleHelper.instance.body14RegularOpenSans
                       .copyWith(color: appTheme.gray_900_01, height: 1.43),
                 ),
-                Spacer(),
+                const Spacer(),
                 Text(
                   'GDPR Compliant',
                   textAlign: TextAlign.center,

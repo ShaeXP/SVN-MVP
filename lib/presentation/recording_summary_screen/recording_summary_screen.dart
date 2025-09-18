@@ -1,6 +1,11 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:lashae_s_application/widgets/session_debug_overlay.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_bottom_bar.dart';
@@ -16,37 +21,42 @@ class RecordingSummaryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: appTheme.white_A700,
-      body: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: appTheme.color281E12,
-              offset: Offset(0, 3),
-              blurRadius: 6,
+      appBar: AppBar(title: const Text('Recorder')),
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: appTheme.color281E12,
+                  offset: Offset(0, 3),
+                  blurRadius: 6,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Obx(() {
-          final currentState = controller.currentState;
+            child: Obx(() {
+              final currentState = controller.currentState;
 
-          if (currentState == 'loading' ||
-              currentState == 'transcribing' ||
-              currentState == 'summarizing') {
-            return _buildProcessingSection(currentState);
-          } else if (currentState.startsWith('error')) {
-            return _buildErrorSection();
-          } else {
-            return SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildHeaderSection(),
-                  _buildContentSection(),
-                ],
-              ),
-            );
-          }
-        }),
+              if (currentState == 'loading' ||
+                  currentState == 'transcribing' ||
+                  currentState == 'summarizing') {
+                return _buildProcessingSection(currentState);
+              } else if (currentState.startsWith('error')) {
+                return _buildErrorSection();
+              } else {
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildHeaderSection(),
+                      _buildContentSection(),
+                    ],
+                  ),
+                );
+              }
+            }),
+          ),
+          SessionDebugOverlay(),
+        ],
       ),
       bottomNavigationBar: CustomBottomBar(
         selectedIndex: 0,
@@ -247,13 +257,13 @@ class RecordingSummaryScreen extends StatelessWidget {
   void _onBottomNavigationChanged(int index) {
     switch (index) {
       case 0:
-        Get.toNamed(AppRoutes.homeScreen);
+        Get.toNamed(Routes.homeScreen);
         break;
       case 1:
-        Get.toNamed(AppRoutes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibraryScreen);
         break;
       case 2:
-        Get.toNamed(AppRoutes.settingsScreen);
+        Get.toNamed(Routes.settingsScreen);
         break;
     }
   }
@@ -386,7 +396,7 @@ class RecordingSummaryScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "• ",
+                              "â€¢ ",
                               style: TextStyleHelper
                                   .instance.body14RegularOpenSans
                                   .copyWith(color: appTheme.accentIndigo),
@@ -617,17 +627,17 @@ class RecordingSummaryScreen extends StatelessWidget {
 
   void _copyAll() {
     final summary = controller.summaryText;
-    final keyPoints = controller.keyPoints.join('\n• ');
-    final actionItems = controller.actionItems.join('\n• ');
+    final keyPoints = controller.keyPoints.join('\nâ€¢ ');
+    final actionItems = controller.actionItems.join('\nâ€¢ ');
 
     String combinedText = 'Summary:\n$summary\n\n';
 
     if (keyPoints.isNotEmpty) {
-      combinedText += 'Key Points:\n• $keyPoints\n\n';
+      combinedText += 'Key Points:\nâ€¢ $keyPoints\n\n';
     }
 
     if (actionItems.isNotEmpty) {
-      combinedText += 'Action Items:\n• $actionItems\n\n';
+      combinedText += 'Action Items:\nâ€¢ $actionItems\n\n';
     }
 
     combinedText += 'Transcript:\n${controller.rawTranscriptJson}';
@@ -642,17 +652,17 @@ class RecordingSummaryScreen extends StatelessWidget {
 
   void _exportShare() {
     final summary = controller.summaryText;
-    final keyPoints = controller.keyPoints.join('\n• ');
-    final actionItems = controller.actionItems.join('\n• ');
+    final keyPoints = controller.keyPoints.join('\nâ€¢ ');
+    final actionItems = controller.actionItems.join('\nâ€¢ ');
 
     String shareText = 'Recording Summary:\n$summary\n\n';
 
     if (keyPoints.isNotEmpty) {
-      shareText += 'Key Points:\n• $keyPoints\n\n';
+      shareText += 'Key Points:\nâ€¢ $keyPoints\n\n';
     }
 
     if (actionItems.isNotEmpty) {
-      shareText += 'Action Items:\n• $actionItems';
+      shareText += 'Action Items:\nâ€¢ $actionItems';
     }
 
     Share.share(shareText, subject: 'Recording Summary');

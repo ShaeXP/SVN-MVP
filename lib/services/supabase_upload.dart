@@ -2,7 +2,7 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../bootstrap_supabase.dart';
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 
 class UploadResult {
   final String runId;
@@ -48,13 +48,12 @@ class SupaUpload {
     // Soft quota (client-side): count by fetching ids and taking length.
     // This avoids the old FetchOptions API entirely.
     const maxRecordingsPerUser = 500;
-    final rows = await Supa.client
-        .from('recordings')
-        .select('id')
-        .eq('user_id', userId);
+    final rows =
+        await Supa.client.from('recordings').select('id').eq('user_id', userId);
     final currentCount = (rows as List).length;
     if (currentCount >= maxRecordingsPerUser) {
-      throw Exception('Quota exceeded: max $maxRecordingsPerUser recordings per user.');
+      throw Exception(
+          'Quota exceeded: max $maxRecordingsPerUser recordings per user.');
     }
     // ----------------------
 
@@ -102,7 +101,8 @@ class SupaUpload {
   }
 
   /// Fetch recent recordings for current user.
-  static Future<List<Map<String, dynamic>>> listMyRecordings({int limit = 20}) async {
+  static Future<List<Map<String, dynamic>>> listMyRecordings(
+      {int limit = 20}) async {
     await _requireUserId();
     final rows = await Supa.client
         .from('recordings')

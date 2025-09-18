@@ -40,19 +40,19 @@ class PreviewModeDetector {
 
     try {
       debugPrint(
-          '🔄 Preview mode: Initializing ${serviceName ?? "service"} with timeout...');
+          'ðŸ”„ Preview mode: Initializing ${serviceName ?? "service"} with timeout...');
 
       return await operation().timeout(
         _initTimeout,
         onTimeout: () {
           debugPrint(
-              '⚠️ Preview mode: ${serviceName ?? "Service"} initialization timed out, using fallback');
+              'âš ï¸ Preview mode: ${serviceName ?? "Service"} initialization timed out, using fallback');
           return fallback;
         },
       );
     } catch (e) {
       debugPrint(
-          '⚠️ Preview mode: ${serviceName ?? "Service"} initialization failed: $e, using fallback');
+          'âš ï¸ Preview mode: ${serviceName ?? "Service"} initialization failed: $e, using fallback');
       return fallback;
     }
   }
@@ -70,18 +70,18 @@ class PreviewModeDetector {
 
     try {
       debugPrint(
-          '🔄 Preview mode: Initializing ${serviceName ?? "service"} with timeout...');
+          'ðŸ”„ Preview mode: Initializing ${serviceName ?? "service"} with timeout...');
 
       await operation().timeout(
         _initTimeout,
         onTimeout: () {
           debugPrint(
-              '⚠️ Preview mode: ${serviceName ?? "Service"} initialization timed out, continuing...');
+              'âš ï¸ Preview mode: ${serviceName ?? "Service"} initialization timed out, continuing...');
         },
       );
     } catch (e) {
       debugPrint(
-          '⚠️ Preview mode: ${serviceName ?? "Service"} initialization failed: $e, continuing...');
+          'âš ï¸ Preview mode: ${serviceName ?? "Service"} initialization failed: $e, continuing...');
     }
   }
 }

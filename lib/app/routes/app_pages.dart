@@ -1,0 +1,28 @@
+import 'package:get/get.dart';
+import 'package:lashae_s_application/app/routes/app_routes.dart';
+
+// TODO: update these imports to match your real file names/paths:
+import 'package:lashae_s_application/presentation/home_screen/home_screen.dart';
+import 'package:lashae_s_application/presentation/settings_screen/settings_screen.dart';
+import 'package:lashae_s_application/presentation/recording_library_screen/recording_library_screen.dart';
+import 'package:lashae_s_application/presentation/recording_summary_screen/recording_summary_screen.dart';
+import 'package:lashae_s_application/presentation/recording_ready_screen/recording_ready_screen_initial_page.dart';
+import 'package:lashae_s_application/presentation/login_screen/login_screen.dart';
+
+class AppPages {
+  static final pages = <GetPage>[
+    GetPage(name: Routes.initial, page: () => HomeScreen()),
+    GetPage(name: Routes.homeScreen, page: () => HomeScreen()),
+    GetPage(name: Routes.settingsScreen, page: () => SettingsScreen()),
+    GetPage(
+        name: Routes.recordingLibraryScreen,
+        page: () => RecordingLibraryScreen()),
+    GetPage(
+        name: Routes.recordingSummaryScreen,
+        page: () => RecordingSummaryScreen()),
+    GetPage(
+        name: Routes.recordingReadyScreenInitialPage,
+        page: () => RecordingReadyScreenInitialPage()),
+    GetPage(name: Routes.loginScreen, page: () => const LoginScreen()),
+  ];
+}

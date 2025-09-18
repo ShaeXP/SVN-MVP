@@ -17,7 +17,7 @@ class FileUploadService {
   /// Pick and upload audio file with same pipeline as recording
   Future<Map<String, dynamic>> pickAndUploadAudioFile() async {
     try {
-      debugPrint('📂 Starting file picker for audio upload...');
+      debugPrint('ðŸ“‚ Starting file picker for audio upload...');
 
       // Step 1: Pick audio file with .webm/.m4a filtering
       final result = await FilePicker.platform.pickFiles(
@@ -35,7 +35,7 @@ class FileUploadService {
       }
 
       final PlatformFile file = result.files.first;
-      debugPrint('✅ File selected: ${file.name} (${file.size} bytes)');
+      debugPrint('âœ… File selected: ${file.name} (${file.size} bytes)');
 
       // Validate file extension
       final String fileName = file.name.toLowerCase();
@@ -81,18 +81,18 @@ class FileUploadService {
       );
 
       if (backendResult['success']) {
-        debugPrint('✅ File upload completed successfully');
+        debugPrint('âœ… File upload completed successfully');
         return {
           ...backendResult,
           'file_name': file.name,
           'file_size': file.size,
         };
       } else {
-        debugPrint('❌ File upload failed: ${backendResult['error']}');
+        debugPrint('âŒ File upload failed: ${backendResult['error']}');
         return backendResult;
       }
     } catch (e) {
-      debugPrint('❌ File upload service error: $e');
+      debugPrint('âŒ File upload service error: $e');
       return {
         'success': false,
         'error': e.toString(),

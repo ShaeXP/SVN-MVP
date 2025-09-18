@@ -1,3 +1,6 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+
+import 'package:get/get.dart';
 import '../../../core/app_export.dart';
 import '../../../services/recording_store.dart';
 import '../models/home_model.dart';
@@ -27,18 +30,18 @@ class HomeController extends GetxController {
   }
 
   void navigateToRecording() {
-    Get.toNamed(AppRoutes.recordingReadyScreen);
+    Get.toNamed(Routes.recordingReadyScreenInitialPage);
   }
 
   /// Navigate to recording ready screen
   void onMicTap() {
-    Get.toNamed(AppRoutes.recordingReadyScreen);
+    Get.toNamed(Routes.recordingReadyScreenInitialPage);
   }
 
   /// Navigate to upload screen (if needed)
   void onUploadTap() {
     // Implementation for upload functionality
-    // Get.toNamed(AppRoutes.uploadScreen);
+    // Get.toNamed(Routes.uploadScreen);
   }
 
   /// Load recordings on app start (after auth)
@@ -61,13 +64,13 @@ class HomeController extends GetxController {
 
     // Navigate to recording ready screen with the generated ID
     Get.toNamed(
-      AppRoutes.recordingReadyScreen,
+      Routes.recordingReadyScreenInitialPage,
       arguments: {'recordingId': recordingId},
     );
   }
 
   /// Navigate to recording library
   void onViewLibrary() {
-    Get.toNamed(AppRoutes.recordingLibraryScreen);
+    Get.toNamed(Routes.recordingLibraryScreen);
   }
 }

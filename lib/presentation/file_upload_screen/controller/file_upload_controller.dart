@@ -1,7 +1,7 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../routes/app_routes.dart';
 import '../../../services/file_upload_service.dart';
 
 class FileUploadController extends GetxController {
@@ -31,7 +31,7 @@ class FileUploadController extends GetxController {
       isUploading.value = true;
       uploadProgress.value = 'Preparing upload...';
 
-      debugPrint('🎯 Starting file selection and upload');
+      debugPrint('ðŸŽ¯ Starting file selection and upload');
 
       // Update progress
       uploadProgress.value = 'Selecting file...';
@@ -43,14 +43,14 @@ class FileUploadController extends GetxController {
         // Success - navigate to summary with run_id
         uploadProgress.value = 'Upload complete!';
 
-        debugPrint('✅ Upload successful: ${result['run_id']}');
+        debugPrint('âœ… Upload successful: ${result['run_id']}');
 
         // Small delay to show success message
         await Future.delayed(Duration(milliseconds: 500));
 
         // Navigate to Summary screen with run_id
         Get.toNamed(
-          AppRoutes.recordingSummaryScreen,
+          Routes.recordingSummaryScreen,
           arguments: {'run_id': result['run_id']},
         );
       } else {
@@ -58,11 +58,11 @@ class FileUploadController extends GetxController {
         final errorMsg =
             result['message'] ?? result['error'] ?? 'Upload failed';
         showError(errorMsg);
-        debugPrint('❌ Upload failed: $errorMsg');
+        debugPrint('âŒ Upload failed: $errorMsg');
       }
     } catch (e) {
       showError('Unexpected error during upload: $e');
-      debugPrint('❌ Upload controller error: $e');
+      debugPrint('âŒ Upload controller error: $e');
     } finally {
       isUploading.value = false;
       uploadProgress.value = '';

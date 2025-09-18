@@ -1,3 +1,7 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
@@ -53,10 +57,10 @@ class SettingsScreen extends GetWidget<SettingsController> {
   void _onBottomNavigationChanged(int index) {
     switch (index) {
       case 0:
-        Get.toNamed(AppRoutes.homeScreen);
+        Get.toNamed(Routes.homeScreen);
         break;
       case 1:
-        Get.toNamed(AppRoutes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibraryScreen);
         break;
       case 2:
         // Already on Settings Screen
@@ -618,7 +622,7 @@ class SettingsScreen extends GetWidget<SettingsController> {
                     .copyWith(color: appTheme.gray_700, height: 1.42),
               ),
               Text(
-                '•',
+                'â€¢',
                 style: TextStyleHelper.instance.body12RegularOpenSans
                     .copyWith(color: appTheme.gray_700, height: 1.42),
               ),
@@ -628,7 +632,7 @@ class SettingsScreen extends GetWidget<SettingsController> {
                     .copyWith(color: appTheme.gray_700, height: 1.42),
               ),
               Text(
-                '•',
+                'â€¢',
                 style: TextStyleHelper.instance.body12RegularOpenSans
                     .copyWith(color: appTheme.gray_700, height: 1.42),
               ),
@@ -643,7 +647,7 @@ class SettingsScreen extends GetWidget<SettingsController> {
         Container(
           margin: EdgeInsets.only(top: 12.h, bottom: 56.h),
           child: Text(
-            '© 2025 SmartVoiceNotes. All rights reserved.',
+            'Â© 2025 SmartVoiceNotes. All rights reserved.',
             style: TextStyleHelper.instance.body12RegularOpenSans
                 .copyWith(color: appTheme.gray_700, height: 1.42),
           ),

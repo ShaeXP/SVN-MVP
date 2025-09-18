@@ -1,9 +1,9 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
 // lib/presentation/recording_control_screen/controller/recording_control_controller.dart
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http; // Add this import
-import '../../../routes/app_routes.dart';
 import '../../../services/pipeline.dart';
 import '../../../services/supabase_service.dart';
 
@@ -66,7 +66,7 @@ class RecordingControlController extends GetxController {
       throw Exception('No recording data to save');
     }
 
-    final user = SupabaseService.instance.client.auth.currentUser;
+    final user = Supa.client.auth.currentUser;
     if (user == null) {
       throw Exception('Please sign in to save');
     }
@@ -95,7 +95,7 @@ class RecordingControlController extends GetxController {
       await pipeline.startAsr(runId, storagePath);
 
       Get.offAllNamed(
-        AppRoutes.recordingSummaryScreen,
+        Routes.recordingSummaryScreen,
         arguments: {'run_id': runId},
       );
     } catch (e) {

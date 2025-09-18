@@ -5,8 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   connectivity_plus
-  just_audio_windows
-  permission_handler_windows
   record_windows
   share_plus
   url_launcher_windows

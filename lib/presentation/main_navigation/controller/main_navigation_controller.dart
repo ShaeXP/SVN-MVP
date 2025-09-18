@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import '../../../core/app_export.dart';
 
 class MainNavigationController extends GetxController {

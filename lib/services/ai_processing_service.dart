@@ -36,7 +36,7 @@ class AIProcessingService {
     String? recordingTitle,
   }) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock AI processing pipeline');
+      debugPrint('ðŸŽ­ Preview mode: Mock AI processing pipeline');
       return await _mockProcessRecording(
         recordingId: recordingId,
         audioFile: audioFile,

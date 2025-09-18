@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart' as rec; // ← alias to avoid name clashes
+import 'package:record/record.dart' as rec; // â† alias to avoid name clashes
 
 class RecordingResult {
   final File file;
@@ -28,13 +28,14 @@ class RealRecordingService implements RecordingService {
     if (!ok) {
       throw Exception(
         'Microphone permission not granted (or blocked by host). '
-        'On Android Emulator: More… › Microphone must be enabled.',
+        'On Android Emulator: Moreâ€¦ â€º Microphone must be enabled.',
       );
     }
 
     // Optional: ensure encoder support; fallback if needed
     final supportsHe = await _rec.isEncoderSupported(rec.AudioEncoder.aacHe);
-    final encoder = supportsHe ? rec.AudioEncoder.aacHe : rec.AudioEncoder.aacLc;
+    final encoder =
+        supportsHe ? rec.AudioEncoder.aacHe : rec.AudioEncoder.aacLc;
 
     final dir = await getTemporaryDirectory();
     _path = '${dir.path}/sv_${DateTime.now().millisecondsSinceEpoch}.m4a';
@@ -54,7 +55,8 @@ class RealRecordingService implements RecordingService {
     final path = await _rec.stop();
     final p = path ?? _path;
     if (p == null) {
-      throw Exception('No audio captured. Try again after granting mic access.');
+      throw Exception(
+          'No audio captured. Try again after granting mic access.');
     }
 
     final dur = _startedAt == null
@@ -73,7 +75,8 @@ class MockRecordingService implements RecordingService {
   @override
   Future<RecordingResult> stopRecording() async {
     final dir = await getTemporaryDirectory();
-    final f = File('${dir.path}/mock_${DateTime.now().millisecondsSinceEpoch}.m4a');
+    final f =
+        File('${dir.path}/mock_${DateTime.now().millisecondsSinceEpoch}.m4a');
     await f.writeAsBytes(const <int>[]); // empty file
     return RecordingResult(file: f, durationMs: 1500);
   }

@@ -1,6 +1,6 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
 import 'package:get/get.dart';
 import 'package:flutter/foundation.dart';
-import '../../../routes/app_routes.dart';
 
 class PreviewHealthCheckController extends GetxController {
   var flutterVersion = ''.obs;
@@ -38,19 +38,19 @@ class PreviewHealthCheckController extends GetxController {
       // Set default Dart version since kDartVersion is not accessible
       dartVersion.value = 'Dart 3.2.x';
     } catch (e) {
-      flutterVersion.value = 'Flutter ≥3.10 (Unknown)';
-      dartVersion.value = 'Dart ≥3.0 (Unknown)';
+      flutterVersion.value = 'Flutter â‰¥3.10 (Unknown)';
+      dartVersion.value = 'Dart â‰¥3.0 (Unknown)';
       debugPrint('Version detection error: $e');
     }
   }
 
   void navigateToMain() {
     // Navigate to the normal app flow
-    Get.offAllNamed(AppRoutes.getInitialRoute());
+    Get.offAllNamed(Routes.getInitialRoute());
   }
 
   void navigateToLogin() {
     // Alternative navigation directly to login
-    Get.offAllNamed(AppRoutes.loginScreen);
+    Get.offAllNamed(Routes.loginScreen);
   }
 }

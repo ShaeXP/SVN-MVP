@@ -1,7 +1,8 @@
+import 'package:lashae_s_application/bootstrap_supabase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UseRunsList {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = Supa.client;
 
   // Stream for realtime updates
   Stream<List<Map<String, dynamic>>>? _runsStream;
@@ -103,6 +104,6 @@ class UseRunsList {
     if (summaryV1 != null && summaryV1['title'] is String) {
       return summaryV1['title'] as String;
     }
-    return 'Transcript processing…';
+    return 'Transcript processingâ€¦';
   }
 }

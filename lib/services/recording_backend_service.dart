@@ -26,11 +26,11 @@ class RecordingBackendService {
     String? existingRunId,
   }) async {
     try {
-      debugPrint('🎤 Starting complete recording backend flow...');
+      debugPrint('ðŸŽ¤ Starting complete recording backend flow...');
 
       // Step 1: Call sv_init_note_run to capture run_id
       final String runId = existingRunId ?? await _initNoteRun();
-      debugPrint('✅ Step 1: Got run_id = $runId');
+      debugPrint('âœ… Step 1: Got run_id = $runId');
 
       // Step 2: Build storage_path with user/<currentUserId>/<run_id>.webm format
       final currentUser = _supabase.currentUser;
@@ -39,15 +39,15 @@ class RecordingBackendService {
       }
 
       final String storagePath = 'user/${currentUser.id}/$runId.webm';
-      debugPrint('✅ Step 2: Built storage_path = $storagePath');
+      debugPrint('âœ… Step 2: Built storage_path = $storagePath');
 
       // Step 3: Call sv_sign_audio_upload with { storage_path } to get signedUrl
       final String signedUrl = await _getSignedUploadUrl(storagePath);
-      debugPrint('✅ Step 3: Got signed URL for upload');
+      debugPrint('âœ… Step 3: Got signed URL for upload');
 
       // Step 4: Upload recorded blob via PUT signedUrl with correct Content-Type
       await _uploadRecordingBlob(signedUrl, recordingBlob);
-      debugPrint('✅ Step 4: Successfully uploaded recording blob');
+      debugPrint('âœ… Step 4: Successfully uploaded recording blob');
 
       // Step 5: Insert/Upsert into public.recordings with uploaded status
       final String recordingId = await _insertRecordingRow(
@@ -56,11 +56,11 @@ class RecordingBackendService {
         storagePath: storagePath,
         durationMs: durationMs,
       );
-      debugPrint('✅ Step 5: Inserted recording row with ID = $recordingId');
+      debugPrint('âœ… Step 5: Inserted recording row with ID = $recordingId');
 
       // Step 6: Call sv_start_asr_job_user to start ASR job
       await _startAsrJob(runId, storagePath);
-      debugPrint('✅ Step 6: Started ASR job');
+      debugPrint('âœ… Step 6: Started ASR job');
 
       return {
         'success': true,
@@ -70,7 +70,7 @@ class RecordingBackendService {
         'message': 'Recording processed successfully'
       };
     } catch (e) {
-      debugPrint('❌ Recording backend flow failed: $e');
+      debugPrint('âŒ Recording backend flow failed: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -198,11 +198,11 @@ class RecordingBackendService {
       );
 
       if (response.statusCode != 200) {
-        debugPrint('⚠️ sv_start_asr_job_user failed, trying fallback...');
+        debugPrint('âš ï¸ sv_start_asr_job_user failed, trying fallback...');
         await _fallbackToDeepgramTranscribe(storagePath);
       }
     } catch (e) {
-      debugPrint('⚠️ ASR job failed, trying fallback: $e');
+      debugPrint('âš ï¸ ASR job failed, trying fallback: $e');
       try {
         await _fallbackToDeepgramTranscribe(storagePath);
       } catch (fallbackError) {

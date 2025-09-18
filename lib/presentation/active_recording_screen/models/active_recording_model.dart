@@ -1,3 +1,5 @@
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:get/get.dart';
 import '../../../core/app_export.dart';
 
 /// This class is used in the [ActiveRecordingScreen] screen with GetX.

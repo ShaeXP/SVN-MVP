@@ -1,18 +1,23 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:get/get.dart';
+// lib/presentation/login_screen/controller/login_controller.dart
 import 'package:flutter/material.dart';
-
+import 'package:lashae_s_application/services/supabase_service.dart';
 import '../../../core/app_export.dart';
-import '../../../services/supabase_service.dart';
 import '../models/login_model.dart';
 
 class LoginController extends GetxController {
-  late TextEditingController emailController;
-  late TextEditingController passwordController;
-  late GlobalKey<FormState> formKey;
+  // Form + fields
+  late final TextEditingController emailController;
+  late final TextEditingController passwordController;
+  late final GlobalKey<FormState> formKey;
 
-  RxBool isLoading = false.obs;
-  RxBool isEmailValid = false.obs;
-  RxBool isPasswordValid = false.obs;
-  Rx<LoginModel?> loginModel = Rx<LoginModel?>(null);
+  // State
+  final RxBool isLoading = false.obs;
+  final RxBool isEmailValid = false.obs;
+  final RxBool isPasswordValid = false.obs;
+  final Rx<LoginModel?> loginModel = Rx<LoginModel?>(null);
 
   @override
   void onInit() {
@@ -30,19 +35,18 @@ class LoginController extends GetxController {
     super.onClose();
   }
 
+  // ----------- Validation -----------
   String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       isEmailValid.value = false;
       return 'Email is required';
     }
-
     final emailRegExp =
         RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     if (!emailRegExp.hasMatch(value)) {
       isEmailValid.value = false;
       return 'Please enter a valid email address';
     }
-
     isEmailValid.value = true;
     return null;
   }
@@ -52,17 +56,30 @@ class LoginController extends GetxController {
       isPasswordValid.value = false;
       return 'Password is required';
     }
-
     if (value.length < 6) {
       isPasswordValid.value = false;
       return 'Password must be at least 6 characters';
     }
-
     isPasswordValid.value = true;
     return null;
   }
 
-  void onSignInPressed() async {
+  bool _validateForm() {
+    final ok = formKey.currentState?.validate() ?? false;
+    if (!ok) {
+      Get.snackbar(
+        'Validation Error',
+        'Please fix the highlighted fields',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: appTheme.red_400,
+        colorText: appTheme.white_A700,
+      );
+    }
+    return ok;
+  }
+
+  // ----------- Auth actions -----------
+  Future<void> onSignInPressed() async {
     if (!_validateForm()) return;
 
     isLoading.value = true;
@@ -72,8 +89,12 @@ class LoginController extends GetxController {
         password: passwordController.text.trim(),
       );
 
+      debugPrint(
+        'LOGIN user=${SupabaseService.instance.client.auth.currentUser?.id}',
+      );
+
       if (response.user != null) {
-        Get.offAllNamed(AppRoutes.homeScreen);
+        Get.offAllNamed(Routes.homeScreen);
         Get.snackbar(
           'Success',
           'Welcome back!',
@@ -95,7 +116,7 @@ class LoginController extends GetxController {
     }
   }
 
-  void onSignUpPressed() async {
+  Future<void> onSignUpPressed() async {
     if (!_validateForm()) return;
 
     isLoading.value = true;
@@ -103,13 +124,13 @@ class LoginController extends GetxController {
       final response = await SupabaseService.instance.signUp(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
-        fullName: 'User', // Default name, can be updated later
+        fullName: 'User',
       );
 
       if (response.user != null) {
         Get.snackbar(
           'Success',
-          'Account created successfully! Please check your email for verification.',
+          'Account created! Check your email for verification.',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: appTheme.green_600,
           colorText: appTheme.white_A700,
@@ -128,143 +149,36 @@ class LoginController extends GetxController {
     }
   }
 
-  bool _validateForm() {
-    if (emailController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter your email address',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
-      return false;
-    }
-
-    if (!GetUtils.isEmail(emailController.text.trim())) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter a valid email address',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
-      return false;
-    }
-
-    if (passwordController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter your password',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
-      return false;
-    }
-
-    if (passwordController.text.trim().length < 6) {
-      Get.snackbar(
-        'Validation Error',
-        'Password must be at least 6 characters long',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
-      return false;
-    }
-
-    return true;
-  }
-
-  void onSignInTap() async {
-    if (formKey.currentState?.validate() == true) {
-      try {
-        isLoading.value = true;
-
-        // Simulate API call
-        await Future.delayed(Duration(seconds: 2));
-
-        // Check demo credentials
-        if (emailController.text == 'demo@example.com' &&
-            passwordController.text == 'demo123') {
-          Get.snackbar(
-            'Success',
-            'Demo login successful!',
-            backgroundColor: appTheme.greenCustom,
-            colorText: appTheme.whiteCustom,
-            snackPosition: SnackPosition.TOP,
-          );
-
-          // Clear form fields
-          emailController.clear();
-          passwordController.clear();
-
-          // Navigate to home screen
-          Get.offAllNamed(AppRoutes.homeScreen);
-        } else {
-          // Regular login validation
-          if (isEmailValid.value && isPasswordValid.value) {
-            Get.snackbar(
-              'Success',
-              'Login successful!',
-              backgroundColor: appTheme.greenCustom,
-              colorText: appTheme.whiteCustom,
-              snackPosition: SnackPosition.TOP,
-            );
-
-            // Clear form fields
-            emailController.clear();
-            passwordController.clear();
-
-            // Navigate to login success screen
-            Get.offAllNamed(AppRoutes.loginSuccessScreen);
-          }
-        }
-      } catch (e) {
-        Get.snackbar(
-          'Error',
-          'Login failed. Please try again.',
-          backgroundColor: appTheme.redCustom,
-          colorText: appTheme.whiteCustom,
-          snackPosition: SnackPosition.TOP,
-        );
-      } finally {
-        isLoading.value = false;
-      }
-    }
-  }
-
+  // ----------- Handlers expected by the Screen -----------
   void onForgotPasswordTap() {
     Get.snackbar(
       'Info',
-      'Forgot password functionality will be implemented',
-      backgroundColor: appTheme.blueCustom,
-      colorText: appTheme.whiteCustom,
-      snackPosition: SnackPosition.TOP,
+      'Forgot password will be implemented.',
+      snackPosition: SnackPosition.BOTTOM,
     );
+  }
+
+  Future<void> onSignInTap() async {
+    await onSignInPressed();
   }
 
   void onGoogleSignInTap() {
     Get.snackbar(
       'Info',
-      'Google sign-in functionality will be implemented',
-      backgroundColor: appTheme.blueCustom,
-      colorText: appTheme.whiteCustom,
-      snackPosition: SnackPosition.TOP,
+      'Google sign-in will be implemented.',
+      snackPosition: SnackPosition.BOTTOM,
     );
   }
 
   void onMicrosoftSignInTap() {
     Get.snackbar(
       'Info',
-      'Microsoft sign-in functionality will be implemented',
-      backgroundColor: appTheme.blueCustom,
-      colorText: appTheme.whiteCustom,
-      snackPosition: SnackPosition.TOP,
+      'Microsoft sign-in will be implemented.',
+      snackPosition: SnackPosition.BOTTOM,
     );
   }
 
   void onCreateAccountTap() {
-    Get.toNamed(AppRoutes.welcomeScreen);
+    Get.toNamed(Routes.loginScreen);
   }
 }

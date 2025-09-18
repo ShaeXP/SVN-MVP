@@ -23,7 +23,7 @@ class OpenAIService {
       if (PreviewModeDetector.isPreviewMode) {
         if (_apiKey.isEmpty) {
           debugPrint(
-              '🎭 Preview mode: OpenAI API key not configured, using mock service');
+              'ðŸŽ­ Preview mode: OpenAI API key not configured, using mock service');
           _createMockDio();
           _isInitialized = true;
           return;
@@ -48,11 +48,11 @@ class OpenAIService {
       _isInitialized = true;
     } catch (e) {
       if (PreviewModeDetector.isPreviewMode) {
-        debugPrint('🎭 Preview mode: OpenAI init failed, using mock service');
+        debugPrint('ðŸŽ­ Preview mode: OpenAI init failed, using mock service');
         _createMockDio();
         _isInitialized = true;
       } else {
-        debugPrint('❌ OpenAI service initialization failed: $e');
+        debugPrint('âŒ OpenAI service initialization failed: $e');
         rethrow;
       }
     }
@@ -81,7 +81,7 @@ class OpenAIService {
     double? temperature,
   }) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock audio transcription');
+      debugPrint('ðŸŽ­ Preview mode: Mock audio transcription');
       await Future.delayed(Duration(milliseconds: 500)); // Simulate processing
       return 'This is a mock transcription for preview mode. The audio file would normally be transcribed using OpenAI Whisper. This is sample text to demonstrate the transcription functionality.';
     }
@@ -124,7 +124,7 @@ class OpenAIService {
     String? verbosity,
   }) async {
     if (PreviewModeDetector.isPreviewMode) {
-      debugPrint('🎭 Preview mode: Mock AI summary generation');
+      debugPrint('ðŸŽ­ Preview mode: Mock AI summary generation');
       await Future.delayed(Duration(milliseconds: 800)); // Simulate processing
       return AISummaryResponse(
         summaryText:

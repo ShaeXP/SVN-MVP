@@ -1,3 +1,5 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:get/get.dart';
 import '../../../core/app_export.dart';
 import '../../../services/recording_store.dart';
 import '../models/recording_paused_model.dart';
@@ -22,20 +24,20 @@ class RecordingPausedController extends GetxController {
     super.onReady();
   }
 
-  // btn_resume → Active Recording Screen with same recordingId
+  // btn_resume â†’ Active Recording Screen with same recordingId
   void onResumePressed() {
     // Navigate back to Active Recording Screen with same recordingId
     Get.toNamed(
-      AppRoutes.activeRecordingScreen,
+      Routes.activeRecordingScreen,
       arguments: {'recordingId': currentRecordingId},
     );
   }
 
-  // btn_stop → Recording Control Screen with recordingId
+  // btn_stop â†’ Recording Control Screen with recordingId
   void onStopPressed() {
     // Navigate to Recording Control Screen with recordingId
     Get.toNamed(
-      AppRoutes.recordingControlScreen,
+      Routes.activeRecordingScreen,
       arguments: {'recordingId': currentRecordingId},
     );
   }

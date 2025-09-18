@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 
-
 /// Controller class for the SupabaseTranscriptionTestScreen.
 ///
 /// This controller manages the state for the transcription test functionality.

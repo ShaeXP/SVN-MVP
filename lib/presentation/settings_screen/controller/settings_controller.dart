@@ -1,3 +1,7 @@
+import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/core/app_export.dart';
+import 'package:sizer/sizer.dart';
+import 'package:get/get.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -39,7 +43,7 @@ class SettingsController extends GetxController {
         iconPath: ImageConstant.imgContainer.obs,
         backgroundColor: '#19a855f7'.obs,
         title: 'Audio Settings'.obs,
-        subtitle: 'Quality: Low Quality • Sensitivity: Normal'.obs,
+        subtitle: 'Quality: Low Quality â€¢ Sensitivity: Normal'.obs,
       ),
       SettingItemModel(
         iconPath: ImageConstant.imgContainerBlueA700.obs,
@@ -126,7 +130,7 @@ class SettingsController extends GetxController {
         Get.back(); // Close progress dialog
 
         // Navigate to hidden screen
-        Get.toNamed(AppRoutes.recordingReadyScreenInitialPage);
+        Get.toNamed(Routes.recordingReadyScreenInitialPage);
 
         Get.snackbar(
           'Hidden Screen Access',
@@ -184,7 +188,7 @@ class SettingsController extends GetxController {
       );
 
       // Navigate to User Sign In (Login Screen) as specified
-      Get.offAllNamed(AppRoutes.loginScreen);
+      Get.offAllNamed(Routes.loginScreen);
     } catch (error) {
       Get.snackbar(
         'Error',
