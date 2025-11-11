@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:record/record.dart';
 
 import '../core/utils/preview_mode_detector.dart';
@@ -8,6 +8,7 @@ import '../data/models/recording_item.dart';
 import './openai_service.dart';
 import './recording_store.dart';
 import './supabase_service.dart';
+import './auth.dart';
 
 class AIProcessingService {
   static final AIProcessingService _instance = AIProcessingService._internal();
@@ -156,9 +157,14 @@ class AIProcessingService {
   /// Upload audio file to Supabase storage (recordings bucket)
   Future<String> _uploadAudioFile(File audioFile, String recordingId) async {
     try {
+      if (recordingId.isEmpty) {
+        throw AIProcessingException('Cannot upload audio file with empty recordingId');
+      }
+
+      final userId = await AuthX.requireUserId();
       final fileName =
           '${recordingId}_${DateTime.now().millisecondsSinceEpoch}.${_getFileExtension(audioFile.path)}';
-      final filePath = '${_supabaseService.currentUser?.id}/$fileName';
+      final filePath = '$userId/$fileName';
 
       final response = await _supabaseService.client.storage
           .from('recordings')
@@ -184,14 +190,23 @@ class AIProcessingService {
     String? title,
   }) async {
     try {
-      await _supabaseService.client.from('recordings').update({
+      if (recordingId.isEmpty) {
+        throw AIProcessingException('Cannot update recording with empty ID');
+      }
+
+      final userId = await AuthX.requireUserId();
+      final updateMap = {
         'url': audioUrl,
         'transcript': transcript,
         'summary': summary,
         'status': 'processed',
         'updated_at': DateTime.now().toIso8601String(),
         if (title != null) 'title': title,
-      }).eq('id', recordingId);
+      };
+      updateMap.removeWhere((k, v) => v == null);
+      updateMap.remove('title');
+      updateMap.remove('trace_id');
+      await SupabaseService.instance.client.from('recordings').update(updateMap).eq('id', recordingId).eq('user_id', userId);
     } catch (e) {
       throw AIProcessingException('Failed to update recording: $e');
     }
@@ -207,9 +222,14 @@ class AIProcessingService {
     required String title,
   }) async {
     try {
-      await _supabaseService.client.from('notes').insert({
+      if (recordingId.isEmpty) {
+        throw AIProcessingException('Cannot create notes entry with empty recordingId');
+      }
+
+      final userId = await AuthX.requireUserId();
+      await SupabaseService.instance.client.from('notes').insert({
         'recording_id': recordingId,
-        'user_id': _supabaseService.currentUser?.id,
+        'user_id': userId,
         'title': title,
         'transcript': transcript,
         'summary': summary,

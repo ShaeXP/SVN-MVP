@@ -17,6 +17,25 @@ class RecorderService {
 
   Future<bool> isAvailable() async => await _recorder.hasPermission();
 
+  /// Check if microphone permission is granted
+  Future<bool> hasMicPermission() async => await _recorder.hasPermission();
+
+  /// Check if any input device is available
+  Future<bool> hasAnyInputDevice() async {
+    try {
+      final inputs = await _recorder.listInputDevices();
+      return inputs != null && inputs.isNotEmpty;
+    } catch (e) {
+      // If listing devices fails, assume no devices available
+      return false;
+    }
+  }
+
+  /// Safe entry point to check if recording can proceed
+  Future<bool> canRecordNow() async {
+    return await hasMicPermission() && await hasAnyInputDevice();
+  }
+
   Future<File> _tempFilePath({required bool useWav}) async {
     final dir = await getTemporaryDirectory();
     final ts = DateTime.now().millisecondsSinceEpoch;

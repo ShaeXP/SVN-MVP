@@ -1,8 +1,8 @@
-import 'package:lashae_s_application/bootstrap_supabase.dart';
+import 'package:lashae_s_application/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UseRunsList {
-  final SupabaseClient _supabase = Supa.client;
+  final SupabaseClient _supabase = SupabaseService.instance.client;
 
   // Stream for realtime updates
   Stream<List<Map<String, dynamic>>>? _runsStream;

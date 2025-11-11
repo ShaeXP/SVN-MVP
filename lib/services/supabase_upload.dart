@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:lashae_s_application/bootstrap_supabase.dart';
+import './auth.dart';
+import './recording_backend_service.dart';
 
 class UploadResult {
   final String runId;
@@ -14,9 +16,7 @@ class SupaUpload {
   static final _uuid = const Uuid();
 
   static Future<String> _requireUserId() async {
-    final user = Supa.client.auth.currentUser;
-    if (user == null) throw Exception('Not authenticated');
-    return user.id;
+    return await AuthX.requireUserId();
   }
 
   /// Upload a recording to Storage and insert a DB row.
@@ -65,14 +65,22 @@ class SupaUpload {
     );
 
     try {
-      // 2) Insert DB row
-      await Supa.client.from('recordings').insert({
+      // 2) Insert DB row using safe insert helper
+      final payload = <String, dynamic>{
         'user_id': userId,
-        'run_id': runId,
         'storage_path': storagePath,
-        'duration_ms': duration.inMilliseconds,
+        'trace_id': runId,
         'status': 'uploaded',
-      });
+        'original_filename': fileName,
+        'mime_type': mime,
+        'duration_sec': (duration.inMilliseconds / 1000).round(),
+      };
+      
+      await RecordingBackendService.instance.safeInsertRecording(
+        supabase: Supa.client,
+        payload: payload,
+        traceId: runId,
+      );
     } catch (e) {
       // Roll back storage if DB insert fails
       try {
@@ -103,10 +111,11 @@ class SupaUpload {
   /// Fetch recent recordings for current user.
   static Future<List<Map<String, dynamic>>> listMyRecordings(
       {int limit = 20}) async {
-    await _requireUserId();
+    final userId = await _requireUserId();
     final rows = await Supa.client
         .from('recordings')
         .select('run_id, storage_path, duration_ms, status, created_at')
+        .eq('user_id', userId)
         .order('created_at', ascending: false)
         .limit(limit);
 

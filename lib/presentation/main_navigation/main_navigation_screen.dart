@@ -1,12 +1,11 @@
-import 'package:lashae_s_application/core/app_export.dart';
-import 'package:sizer/sizer.dart';
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-import '../../core/app_export.dart';
+import '../../ui/visuals/brand_background.dart';
+import '../../ui/visuals/glass_dock.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../home_screen/home_screen.dart';
-import '../recording_library_screen/recording_library_screen.dart';
+import '../library/library_screen.dart';
 import '../settings_screen/settings_screen.dart';
 import './controller/main_navigation_controller.dart';
 
@@ -14,34 +13,37 @@ class MainNavigationScreen extends StatelessWidget {
   MainNavigationScreen({Key? key}) : super(key: key);
 
   final MainNavigationController controller =
-      Get.put(MainNavigationController());
+      Get.find<MainNavigationController>();
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        body: Obx(() => _getCurrentScreen()),
-        bottomNavigationBar: Obx(() => CustomBottomBar(
-              selectedIndex: controller.selectedIndex.value,
-              onChanged: (index) => controller.onNavItemTapped(index),
-              backgroundColor: appTheme.whiteCustom,
-              hasShadow: true,
-              iconSize: 20.h,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          const BrandGradientBackground(),
+          SafeArea(
+            child: Obx(() => IndexedStack(
+              index: controller.selectedIndex.value,
+              children: const [
+                HomeScreen(),
+                LibraryScreen(), 
+                SettingsScreen(),
+              ],
             )),
+          ),
+        ],
       ),
+      bottomNavigationBar: Obx(() => GlassDock(
+        child: CustomBottomBar(
+          selectedIndex: controller.selectedIndex.value,
+          onChanged: (index) => controller.onNavItemTapped(index),
+          backgroundColor: Colors.transparent,
+          hasShadow: false,
+          iconSize: 24.0,
+        ),
+      )),
     );
   }
 
-  Widget _getCurrentScreen() {
-    switch (controller.selectedIndex.value) {
-      case 0:
-        return HomeScreen(); // Voice Recording Home
-      case 1:
-        return RecordingLibraryScreen(); // Recording Library
-      case 2:
-        return SettingsScreen(); // Settings Menu
-      default:
-        return HomeScreen();
-    }
-  }
 }

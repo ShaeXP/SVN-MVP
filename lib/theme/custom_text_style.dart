@@ -61,6 +61,14 @@ class TextStyleHelper {
         color: appTheme.textPrimaryDark,
       );
 
+  TextStyle get title24BoldOpenSans => TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        height: 1.33,
+        fontFamily: "Inter",
+        color: appTheme.textPrimaryDark,
+      );
+
   // Generic button label
   TextStyle get textStyle18 => const TextStyle(
         fontSize: 18,

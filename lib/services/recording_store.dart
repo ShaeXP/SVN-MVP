@@ -4,6 +4,8 @@ import 'dart:io';
 import '../data/repositories/recording_repository.dart';
 import '../data/repositories/recording_repository_supabase.dart';
 import '../data/models/recording_item.dart';
+import '../domain/recordings/recording_status.dart';
+import '../services/logger.dart';
 
 class RecordingStore {
   RecordingStore._();
@@ -39,6 +41,14 @@ class RecordingStore {
   /// Add or update recording item (with write-through to database)
   Future<void> addOrUpdate({
     required String id,
+    String? userId,
+    DateTime? createdAt,
+    int? durationSec,
+    RecordingStatus? status,
+    String? storagePath,
+    String? transcriptId,
+    String? summaryId,
+    String? traceId,
     String? title,
     String? date,
     String? duration,
@@ -57,6 +67,14 @@ class RecordingStore {
       // Create new item with defaults for null values
       item = RecordingItem(
         id: id,
+        userId: userId ?? 'unknown',
+        createdAt: createdAt ?? DateTime.now(),
+        durationSec: durationSec ?? 0,
+        status: status ?? RecordingStatus.local,
+        storagePath: storagePath ?? '',
+        transcriptId: transcriptId,
+        summaryId: summaryId,
+        traceId: traceId,
         title: title ?? "Recording ${DateTime.now().toIso8601String()}",
         date: date ?? DateTime.now().toIso8601String(),
         duration: duration ?? "0:00",
@@ -69,6 +87,14 @@ class RecordingStore {
     } else {
       // Update existing item using copyWith - field-by-field merge
       item = existing.copyWith(
+        userId: userId,
+        createdAt: createdAt,
+        durationSec: durationSec,
+        status: status,
+        storagePath: storagePath,
+        transcriptId: transcriptId,
+        summaryId: summaryId,
+        traceId: traceId,
         title: title,
         date: date,
         duration: duration,
@@ -87,6 +113,7 @@ class RecordingStore {
     try {
       // Write-through to database
       await _repository.upsertMetadata(item);
+      logx('Recording item updated: ${item.id}', tag: 'STORE');
     } catch (e) {
       // Rollback optimistic update on failure
       if (existing != null) {
@@ -95,7 +122,35 @@ class RecordingStore {
         _items.remove(item.id);
       }
       _emitList();
+      logx('Failed to update recording item: $e', tag: 'STORE', error: e);
       rethrow;
+    }
+  }
+
+  /// Update recording status
+  Future<void> updateStatus(String id, RecordingStatus status) async {
+    final existing = _items[id];
+    if (existing != null) {
+      await addOrUpdate(
+        id: id,
+        status: status,
+        // Keep all existing values
+        userId: existing.userId,
+        createdAt: existing.createdAt,
+        durationSec: existing.durationSec,
+        storagePath: existing.storagePath,
+        transcriptId: existing.transcriptId,
+        summaryId: existing.summaryId,
+        traceId: existing.traceId,
+        title: existing.title,
+        date: existing.date,
+        duration: existing.duration,
+        audioUrl: existing.audioUrl,
+        transcript: existing.transcript,
+        summaryText: existing.summaryText,
+        actions: existing.actions,
+        keypoints: existing.keypoints,
+      );
     }
   }
 
@@ -111,12 +166,14 @@ class RecordingStore {
     try {
       // Write-through to database
       await _repository.delete(id);
+      logx('Recording item removed: $id', tag: 'STORE');
     } catch (e) {
       // Rollback optimistic update on failure
       if (removedItem != null) {
         _items[id] = removedItem;
         _emitList();
       }
+      logx('Failed to remove recording item: $e', tag: 'STORE', error: e);
       rethrow;
     }
   }
@@ -129,9 +186,14 @@ class RecordingStore {
   /// Get list of all recordings
   List<RecordingItem> list() {
     final items = _items.values.toList();
-    // Sort by title for consistent ordering
-    items.sort((a, b) => a.title.compareTo(b.title));
+    // Sort by creation date (newest first)
+    items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return items;
+  }
+
+  /// Get recordings by status
+  List<RecordingItem> getByStatus(RecordingStatus status) {
+    return _items.values.where((item) => item.status == status).toList();
   }
 
   /// Fetch all recordings from database and update store
@@ -146,14 +208,23 @@ class RecordingStore {
       }
 
       _emitList();
+      logx('Fetched ${recordings.length} recordings from database', tag: 'STORE');
     } catch (e) {
+      logx('Failed to fetch recordings: $e', tag: 'STORE', error: e);
       throw Exception('Failed to fetch recordings: $e');
     }
   }
 
   /// Upload audio file for recording
   Future<String> uploadAudio(String recordingId, File audioFile) async {
-    return await _repository.uploadAudio(recordingId, audioFile);
+    try {
+      final url = await _repository.uploadAudio(recordingId, audioFile);
+      logx('Audio uploaded for recording: $recordingId', tag: 'STORE');
+      return url;
+    } catch (e) {
+      logx('Failed to upload audio for recording $recordingId: $e', tag: 'STORE', error: e);
+      rethrow;
+    }
   }
 
   /// Emit current list to stream subscribers
@@ -165,6 +236,7 @@ class RecordingStore {
   void clear() {
     _items.clear();
     _emitList();
+    logx('Recording store cleared', tag: 'STORE');
   }
 
   /// Dispose resources

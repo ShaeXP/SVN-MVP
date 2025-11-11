@@ -27,13 +27,14 @@ class RecordingReadyController extends GetxController {
   void startRecording() {
     isRecording.value = true;
     statusText.value = 'Recording...';
-    Get.toNamed(Routes.activeRecordingScreen);
+    // Use navigator id: 1 for Record tab's nested navigator
+    Get.toNamed(Routes.activeRecording, id: 1);
   }
 
   void pauseRecording() {
     isRecording.value = false;
     statusText.value = 'Paused';
-    Get.toNamed(Routes.recordingPausedScreen);
+    Get.toNamed(Routes.recordingPaused, id: 1);
   }
 
   void onStopPressed() {

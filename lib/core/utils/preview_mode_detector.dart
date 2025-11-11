@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
 /// Utility class to detect if app is running in preview mode
 /// and handle external service initialization with timeouts

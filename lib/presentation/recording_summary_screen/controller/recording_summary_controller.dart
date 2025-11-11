@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'package:flutter/material.dart';
 import '../../../core/app_export.dart';

@@ -1,670 +1,707 @@
-import 'package:lashae_s_application/app/routes/app_pages.dart';
-import 'package:lashae_s_application/core/app_export.dart';
-import 'package:sizer/sizer.dart';
-import 'package:get/get.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:lashae_s_application/widgets/session_debug_overlay.dart';
+import 'package:get/get.dart';
+import 'package:lashae_s_application/data/recording_repo.dart';
+import 'package:lashae_s_application/services/pipeline_service.dart';
+import 'package:lashae_s_application/services/function_probe.dart';
+import 'package:lashae_s_application/presentation/recording_library_screen/widgets/status_chip.dart' as statusui;
+import 'package:lashae_s_application/ui/visuals/brand_background.dart';
+import 'package:lashae_s_application/ui/visuals/glass_card.dart';
+import 'package:lashae_s_application/ui/theme/svn_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../ui/util/safe_ui.dart';
+import '../../controllers/recording_summary_controller.dart';
+import '../../env.dart';
+import '../../ui/util/pipeline_step.dart';
+import '../../ui/widgets/pipeline_progress.dart';
+import '../../ui/widgets/svn_card.dart';
+import '../../ui/app_spacing.dart';
+import '../../ui/widgets/svn_page.dart';
 
-import '../../core/app_export.dart';
-import '../../widgets/custom_bottom_bar.dart';
-import '../../widgets/custom_image_view.dart';
-import './controller/recording_summary_controller.dart';
+// Function name constant to prevent drift
+const kFnEmailDocx = 'sv_email_summary_docx';
 
-class RecordingSummaryScreen extends StatelessWidget {
-  RecordingSummaryScreen({Key? key}) : super(key: key);
+class RecordingSummaryScreen extends StatefulWidget {
+  const RecordingSummaryScreen({super.key});
 
-  final RecordingSummaryController controller =
+  @override
+  State<RecordingSummaryScreen> createState() => _RecordingSummaryScreenState();
+}
+
+class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
+  final repo = RecordingRepo();
+  final pipe = PipelineService();
+  final probe = FunctionProbe();
+
+  String recordingId = '';
+  Map<String, dynamic>? summary;
+  bool summarizing = false;
+  bool rerunning = false;
+  bool hasInvalidArgs = false;
+  bool _sendingDocx = false;
+  StreamSubscription<Map<String, dynamic>?>? _recordingSub;
+  Map<String, dynamic>? _recordingRow;
+  String _recordingStatus = 'processing';
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Defensive argument parsing (supports both new and baseline formats)
+    final args = Get.arguments as Map? ?? {};
+    final recId = args['recordingId'] as String?;
+    final sumId = args['summaryId'] as String?;
+    final transcriptId = args['transcript_id'] as String?;
+    final runId = args['run_id'] as String?;
+    
+    debugPrint('[SUMMARY] args recordingId=$recId summaryId=$sumId transcript_id=$transcriptId run_id=$runId');
+    
+    // Use recordingId if available, otherwise fall back to transcript_id/run_id
+    final id = recId ?? transcriptId ?? runId;
+    
+    if (id == null || id.isEmpty) {
+      debugPrint('[SUMMARY] Missing recordingId/transcript_id/run_id. args=$args');
+      setState(() {
+        hasInvalidArgs = true;
+      });
+      return;
+    }
+    
+    recordingId = id;
+    debugPrint('[SUMMARY] Using recordingId=$recordingId');
+    
+    // Initialize the summary controller
+    if (!Get.isRegistered<RecordingSummaryController>()) {
       Get.put(RecordingSummaryController());
+    }
+    final controller = Get.find<RecordingSummaryController>();
+    if (!controller.hasLoaded.value || controller.recordingId != recordingId) {
+      controller.initWith(recordingId);
+    }
+    
+    _loadSummary();
+    _subscribeToRecording();
+  }
+
+  Future<void> _loadSummary() async {
+    if (recordingId.isEmpty) return;
+    try {
+      final s = await repo.getSummaryByRecording(recordingId);
+      if (mounted) {
+        setState(() {
+          summary = s;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load summary: $e');
+    }
+  }
+
+  Future<void> _summarize() async {
+    if (recordingId.isEmpty) return;
+    setState(() {
+      summarizing = true;
+    });
+    try {
+      await pipe.rerunByRecordingId(recordingId);
+      await _loadSummary();
+    } catch (e) {
+      debugPrint('Failed to summarize: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          summarizing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _rerun() async {
+    if (recordingId.isEmpty) return;
+    setState(() {
+      rerunning = true;
+    });
+    try {
+      await pipe.rerunByRecordingId(recordingId);
+      await _loadSummary();
+    } catch (e) {
+      debugPrint('Failed to rerun: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          rerunning = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _checkPipelineHealth() async {
+    try {
+      final health = await FunctionProbe.ping();
+      if (mounted) {
+        safeSnackBar(
+          title: 'Pipeline Health',
+          message: health.toString(),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        safeSnackBar(
+          title: 'Health Check Failed',
+          message: e.toString(),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteRecording(BuildContext context) async {
+    if (recordingId.isEmpty) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Recording'),
+        content: const Text('Are you sure you want to delete this recording? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        // TODO: Implement summary deletion if needed
+        // For now, just show a message that deletion is not available
+        Get.snackbar('Info', 'Summary deletion not yet implemented');
+      } catch (e) {
+        if (mounted) {
+          safeSnackBar(
+            title: 'Delete Failed',
+            message: 'Failed to delete: $e',
+          );
+        }
+      }
+    }
+  }
+
+  void _subscribeToRecording() {
+     _recordingSub?.cancel();
+     if (recordingId.isEmpty) return;
+ 
+     _recordingSub = repo.streamRecording(recordingId).listen((row) {
+       if (!mounted) return;
+       final status = (row?['status'] ?? 'processing').toString();
+       final shouldLoadSummary =
+           (status == 'uploaded' || status == 'processing' || status == 'ready') && summary == null;
+      final hasPrevRow = _recordingRow != null;
+      final prevStatus = _recordingStatus;
+      final prevUpdated = _recordingRow?['updated_at'];
+      final nextUpdated = row?['updated_at'];
+ 
+      if (!(hasPrevRow && prevStatus == status && prevUpdated == nextUpdated)) {
+        setState(() {
+          _recordingRow = row;
+          _recordingStatus = status;
+        });
+      }
+ 
+       if (shouldLoadSummary) {
+         _loadSummary();
+       }
+     });
+   }
+
+  @override
+  void dispose() {
+    _recordingSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Recorder')),
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: appTheme.color281E12,
-                  offset: Offset(0, 3),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
-            child: Obx(() {
-              final currentState = controller.currentState;
-
-              if (currentState == 'loading' ||
-                  currentState == 'transcribing' ||
-                  currentState == 'summarizing') {
-                return _buildProcessingSection(currentState);
-              } else if (currentState.startsWith('error')) {
-                return _buildErrorSection();
-              } else {
-                return SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildHeaderSection(),
-                      _buildContentSection(),
-                    ],
-                  ),
-                );
-              }
-            }),
+    // Show inline error state for invalid arguments
+    if (hasInvalidArgs) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Recording Details'),
+          leading: BackButton(
+            onPressed: () => Navigator.of(context).pop(),
           ),
-          SessionDebugOverlay(),
-        ],
-      ),
-      bottomNavigationBar: CustomBottomBar(
-        selectedIndex: 0,
-        onChanged: (index) {
-          _onBottomNavigationChanged(index);
-        },
-      ),
-    );
-  }
-
-  Widget _buildProcessingSection(String state) {
-    String title;
-    String description;
-    Widget icon;
-
-    switch (state) {
-      case 'transcribing':
-        title = 'Transcribing Audio';
-        description = 'Converting speech to text...';
-        icon = CircularProgressIndicator(
-          color: appTheme.primary,
-          strokeWidth: 3.0,
-        );
-        break;
-      case 'summarizing':
-        title = 'Generating Summary';
-        description = 'Creating intelligent insights...';
-        icon = CircularProgressIndicator(
-          color: appTheme.secondary,
-          strokeWidth: 3.0,
-        );
-        break;
-      default:
-        title = 'Loading';
-        description = 'Initializing...';
-        icon = CircularProgressIndicator(
-          color: appTheme.primary,
-          strokeWidth: 3.0,
-        );
-    }
-
-    return Column(
-      children: [
-        _buildHeaderSection(),
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              spacing: 24.h,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(20.h),
-                  decoration: BoxDecoration(
-                    color: appTheme.neutral,
-                    shape: BoxShape.circle,
-                  ),
-                  child: icon,
-                ),
-                Column(
-                  spacing: 8.h,
+        ),
+        body: Stack(
+          children: [
+            const BrandGradientBackground(),
+            Center(
+              child: Padding(
+                padding: AppSpacing.sectionPadding(context),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      title,
-                      style:
-                          TextStyleHelper.instance.headline24BoldQuattrocento,
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red,
                     ),
+                    AppSpacing.v(context, 1),
                     Text(
-                      description,
-                      textAlign: TextAlign.center,
-                      style: TextStyleHelper.instance.body14RegularOpenSans
-                          .copyWith(color: appTheme.gray_700),
+                      'Can\'t open recording',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    AppSpacing.v(context, 0.5),
+                    Text(
+                      'Missing recording ID',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    AppSpacing.v(context, 1.5),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Go Back'),
                     ),
                   ],
                 ),
-                // Progress indicator with estimated time
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 40.h),
-                  padding: EdgeInsets.all(16.h),
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_50,
-                    borderRadius: BorderRadius.circular(8.h),
-                    border: Border.all(color: appTheme.gray_300),
-                  ),
-                  child: Column(
-                    spacing: 8.h,
-                    children: [
-                      Text(
-                        _getEstimatedTime(state),
-                        style: TextStyleHelper.instance.body12RegularOpenSans
-                            .copyWith(color: appTheme.gray_700),
-                      ),
-                      LinearProgressIndicator(
-                        color: appTheme.primary,
-                        backgroundColor: appTheme.gray_200,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _getEstimatedTime(String state) {
-    switch (state) {
-      case 'transcribing':
-        return 'Usually takes 30-60 seconds';
-      case 'summarizing':
-        return 'Usually takes 15-30 seconds';
-      default:
-        return 'Please wait...';
-    }
-  }
-
-  Widget _buildErrorSection() {
-    return Column(
-      children: [
-        _buildHeaderSection(),
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.all(24.h),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                spacing: 20.h,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(20.h),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withAlpha(26),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.error_outline,
-                      color: Colors.red,
-                      size: 48.h,
-                    ),
-                  ),
-                  Text(
-                    'Processing Failed',
-                    style: TextStyleHelper.instance.headline24BoldQuattrocento
-                        .copyWith(color: Colors.red),
-                  ),
-                  Text(
-                    controller.stateMessage,
-                    textAlign: TextAlign.center,
-                    style: TextStyleHelper.instance.body14RegularOpenSans
-                        .copyWith(color: appTheme.gray_700),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    spacing: 12.h,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () => controller.retry(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: appTheme.primary,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 24.h,
-                            vertical: 12.h,
-                          ),
-                        ),
-                        child: Text(
-                          'Retry',
-                          style: TextStyleHelper.instance.body14SemiBoldOpenSans
-                              .copyWith(color: appTheme.white_A700),
-                        ),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => Get.back(),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: appTheme.gray_300),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 24.h,
-                            vertical: 12.h,
-                          ),
-                        ),
-                        child: Text(
-                          'Go Back',
-                          style: TextStyleHelper.instance.body14SemiBoldOpenSans
-                              .copyWith(color: appTheme.gray_900),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      );
+    }
+
+    // If recordingId is empty, show loading state
+    if (recordingId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Recording Details'),
+        leading: BackButton(
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          // Email DOCX button
+          Material(
+            type: MaterialType.transparency,
+            child: IconButton(
+              icon: _sendingDocx
+                  ? const SizedBox(
+                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.email_outlined),
+              tooltip: 'Email me a DOCX',
+              onPressed: (recordingId.isEmpty || _sendingDocx) ? null : _emailDocx,
+            ),
+          ),
+          // Delete button
+          Material(
+            type: MaterialType.transparency,
+            child: IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete',
+              onPressed: recordingId.isEmpty ? null : () => _deleteRecording(context),
+            ),
+          ),
+          // DEV: Pipeline Health Check
+          Material(
+            type: MaterialType.transparency,
+            child: IconButton(
+              tooltip: 'Pipeline Health (DEV)',
+              onPressed: _checkPipelineHealth,
+              icon: const Icon(Icons.health_and_safety),
+            ),
+          ),
+          Material(
+            type: MaterialType.transparency,
+            child: IconButton(
+              tooltip: 'Re-run',
+              onPressed: (recordingId.isEmpty || rerunning) ? null : _rerun,
+              icon: rerunning
+                ? const SizedBox(
+                    width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          const BrandGradientBackground(),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: AppSpacing.screenPadding(context).add(
+                    EdgeInsets.only(bottom: AppSpacing.base(context) * 0.75),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Live status header
+                        SVNCard(
+                          child: Builder(
+                            builder: (context) {
+                              final status = _recordingStatus;
+                              final row = _recordingRow;
+                              final createdRaw = (row?['created_at'] ?? '').toString();
+                              final created = DateTime.tryParse(createdRaw)?.toLocal();
+                              final step = mapStatusToStep(status);
+                              final showSummarizeAction =
+                                  (status.toLowerCase() == 'transcribing' || status.toLowerCase() == 'error') &&
+                                      summary == null &&
+                                      !summarizing;
+
+                              return LayoutBuilder(
+                                builder: (context, statusConstraints) {
+                                  final base = AppSpacing.base(context);
+
+                                  Widget buildStatusLabel() {
+                                    return Wrap(
+                                      spacing: base * 0.5,
+                                      runSpacing: base * 0.25,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Status',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(color: SVNTheme.textMuted),
+                                        ),
+                                        statusui.StatusChip(status: status),
+                                      ],
+                                    );
+                                  }
+
+                                  List<Widget> buildActions() {
+                                    final actions = <Widget>[];
+                                    if (showSummarizeAction) {
+                                      actions.add(
+                                        FilledButton.icon(
+                                          onPressed: _summarize,
+                                          icon: const Icon(Icons.auto_awesome, size: 18),
+                                          label: Text(
+                                            status.toLowerCase() == 'error' ? 'Retry' : 'Summarize',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    if (summarizing) {
+                                      actions.add(
+                                        SizedBox(
+                                          width: base * 3,
+                                          child: const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return actions;
+                                  }
+
+                                  final actions = buildActions();
+                                  final isCompact = statusConstraints.maxWidth < 400;
+
+                                  if (actions.isEmpty) {
+                                    return buildStatusLabel();
+                                  }
+
+                                  if (isCompact) {
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        buildStatusLabel(),
+                                        AppSpacing.v(context, 0.5),
+                                        Wrap(
+                                          spacing: base * 0.5,
+                                          runSpacing: base * 0.25,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: actions,
+                                        ),
+                                      ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: buildStatusLabel(),
+                                        ),
+                                      ),
+                                      Wrap(
+                                        spacing: base * 0.5,
+                                        runSpacing: base * 0.25,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        alignment: WrapAlignment.end,
+                                        children: actions,
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+
+                      AppSpacing.v(context, 1),
+
+                      // Summary body
+                      if (summary == null) ...[
+                        GlassCard(
+                          child: Text(
+                            'Processing… When complete, your summary and notes will appear here.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ] else ...[
+                        // Title
+                        Text((summary!['title'] ?? 'Summary').toString(),
+                            style: Theme.of(context).textTheme.titleLarge),
+                        AppSpacing.v(context, 0.75),
+
+                        // Summary text
+                        GlassCard(
+                          child: Text((summary!['summary'] ?? '—').toString(),
+                              style: Theme.of(context).textTheme.bodyMedium),
+                        ),
+                        AppSpacing.v(context, 1),
+
+                        // Bullets (if present)
+                        if (summary!['bullets'] is List &&
+                            (summary!['bullets'] as List).isNotEmpty) ...[
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Key Points', style: Theme.of(context).textTheme.titleMedium),
+                                AppSpacing.v(context, 0.5),
+                                for (final b in (summary!['bullets'] as List))
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(vertical: AppSpacing.base(context) * 0.25),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('•  '),
+                                        Expanded(child: Text(b.toString())),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          AppSpacing.v(context, 1),
+                        ],
+
+                        // Action items
+                        if (summary!['action_items'] is List &&
+                            (summary!['action_items'] as List).isNotEmpty) ...[
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Action Items', style: Theme.of(context).textTheme.titleMedium),
+                                AppSpacing.v(context, 0.5),
+                                for (final a in (summary!['action_items'] as List))
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(vertical: AppSpacing.base(context) * 0.25),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('✓  '),
+                                        Expanded(child: Text(a.toString())),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          AppSpacing.v(context, 1),
+                        ],
+                      ],
+
+                      // Raw notes
+                      Text('Raw Notes', style: Theme.of(context).textTheme.titleLarge),
+                      AppSpacing.v(context, 0.75),
+                      _rawNotesCard(),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _onBottomNavigationChanged(int index) {
-    switch (index) {
-      case 0:
-        Get.toNamed(Routes.homeScreen);
-        break;
-      case 1:
-        Get.toNamed(Routes.recordingLibraryScreen);
-        break;
-      case 2:
-        Get.toNamed(Routes.settingsScreen);
-        break;
+  Widget _rawNotesCard() {
+     final controller = Get.find<RecordingSummaryController>();
+     return Obx(() => GlassCard(
+       child: Column(
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: [
+           if (controller.saving.value) 
+             Padding(
+               padding: EdgeInsets.only(bottom: AppSpacing.base(context) * 0.5),
+               child: Text(
+                 'Saving…',
+                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                   color: Theme.of(context).colorScheme.primary,
+                 ),
+               ),
+             ),
+           TextField(
+             key: const Key('notes_editor'),
+             controller: TextEditingController.fromValue(
+               TextEditingValue(
+                 text: controller.notes.value, 
+                 selection: TextSelection.collapsed(offset: controller.notes.value.length)
+               ),
+             ),
+             onChanged: controller.onNotesChanged,
+             minLines: 2,
+             maxLines: 8,
+             textInputAction: TextInputAction.newline,
+             decoration: const InputDecoration(
+               hintText: 'Add your notes…',
+               border: OutlineInputBorder(borderSide: BorderSide.none),
+               filled: true,
+             ),
+           ),
+           AppSpacing.v(context, 0.5),
+           Text(
+             controller.saving.value ? 'Saving…' : 'Saved automatically',
+             style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                 ),
+           ),
+         ],
+       ),
+     ));
+   }
+
+  Future<void> _emailDocx() async {
+    final client = Supabase.instance.client;
+    
+    // Use currentSession; optional refresh
+    final session = client.auth.currentSession;
+    String? token = session?.accessToken;
+
+    if (token == null && session?.refreshToken != null) {
+      try {
+        await client.auth.refreshSession();
+        token = client.auth.currentSession?.accessToken;
+      } catch (_) {
+        // ignore; fallback to sign-in required
+      }
+    }
+
+    if (token == null) {
+      Get.snackbar('Sign in required', 'Please sign in to email this summary.');
+      return;
+    }
+    
+    setState(() => _sendingDocx = true);
+    
+    const kFnEmailDocx = 'sv_email_summary_docx';
+    
+    try {
+      // Get summaryId if available from the summary data
+      String? latestSummaryId;
+      if (summary != null && summary!['id'] != null) {
+        latestSummaryId = summary!['id'].toString();
+      }
+      
+      debugPrint('[EMAIL_DOCX] invoking $kFnEmailDocx rec=$recordingId sum=$latestSummaryId');
+      final resp = await client.functions.invoke(
+        kFnEmailDocx,
+        headers: {'Authorization': 'Bearer $token'},
+        body: {
+          'recordingId': recordingId,          // existing screen variable
+          'summaryId': latestSummaryId,        // include if available; else omit
+        },
+      );
+      final data = resp.data as Map?;
+      final ok = data?['ok'] == true;
+      final msgId = data?['id'];
+      Get.snackbar(ok ? 'Sent' : 'Failed',
+        ok ? 'Check your inbox. ID: $msgId' : '${resp.data}');
+    } catch (e) {
+      Get.snackbar('Failed', '$e');
+    } finally {
+      setState(() => _sendingDocx = false);
     }
   }
+}
 
-  Widget _buildHeaderSection() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        border: Border(
-          bottom: BorderSide(
-            color: appTheme.colorE67FDE,
-            width: 1.h,
-          ),
-        ),
-      ),
-      padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 12.h),
+class _ExpandableTextCard extends StatefulWidget {
+  final String title;
+  final String text;
+  final int previewChars;
+  const _ExpandableTextCard({
+    required this.title, 
+    required this.text, 
+    this.previewChars = 280
+  });
+
+  @override
+  State<_ExpandableTextCard> createState() => _ExpandableTextCardState();
+}
+
+class _ExpandableTextCardState extends State<_ExpandableTextCard> {
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = expanded || widget.text.length <= widget.previewChars
+        ? widget.text
+        : widget.text.substring(0, widget.previewChars) + '…';
+
+    return GlassCard(
       child: Column(
-        spacing: 22.h,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                margin: EdgeInsets.only(left: 10.h, top: 4.h),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgGroup,
-                  height: 10.h,
-                  width: 26.h,
-                ),
+              Text(
+                widget.title,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              CustomImageView(
-                imagePath: ImageConstant.imgGroupGray900,
-                height: 10.h,
-                width: 64.h,
+              IconButton(
+                tooltip: 'Copy',
+                icon: const Icon(Icons.copy_rounded),
+                onPressed: () => Clipboard.setData(ClipboardData(text: widget.text)),
               ),
             ],
           ),
-          Container(
-            margin: EdgeInsets.only(bottom: 10.h),
-            child: Text(
-              'Summary & Notes',
-              style: TextStyleHelper.instance.title18BoldQuattrocento
-                  .copyWith(height: 1.11),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContentSection() {
-    return Container(
-      margin: EdgeInsets.all(16.h),
-      child: Column(
-        spacing: 16.h,
-        children: [
-          // Summary section
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16.h),
-            decoration: BoxDecoration(
-              color: appTheme.white_A700,
-              borderRadius: BorderRadius.circular(8.h),
-              border: Border.all(color: appTheme.gray_300),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 12.h,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.summarize,
-                      color: appTheme.primary,
-                      size: 20.h,
-                    ),
-                    SizedBox(width: 8.h),
-                    Text(
-                      'Summary',
-                      style: TextStyleHelper.instance.title16SemiBoldOpenSans
-                          .copyWith(color: appTheme.primary),
-                    ),
-                  ],
-                ),
-                Obx(() => Text(
-                      controller.summaryText,
-                      style: TextStyleHelper.instance.body14RegularOpenSans
-                          .copyWith(height: 1.43),
-                    )),
-              ],
-            ),
-          ),
-
-          // Key Points section
-          Obx(() {
-            final keyPoints = controller.keyPoints;
-            if (keyPoints.isEmpty) return SizedBox.shrink();
-
-            return Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(16.h),
-              decoration: BoxDecoration(
-                color: appTheme.white_A700,
-                borderRadius: BorderRadius.circular(8.h),
-                border: Border.all(color: appTheme.gray_300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 12.h,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.lightbulb_outline,
-                        color: appTheme.accentIndigo,
-                        size: 20.h,
-                      ),
-                      SizedBox(width: 8.h),
-                      Text(
-                        'Key Points',
-                        style: TextStyleHelper.instance.title16SemiBoldOpenSans
-                            .copyWith(color: appTheme.accentIndigo),
-                      ),
-                    ],
-                  ),
-                  ...keyPoints.map((point) => Padding(
-                        padding: EdgeInsets.only(left: 8.h, bottom: 4.h),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "â€¢ ",
-                              style: TextStyleHelper
-                                  .instance.body14RegularOpenSans
-                                  .copyWith(color: appTheme.accentIndigo),
-                            ),
-                            Expanded(
-                              child: Text(
-                                point,
-                                style: TextStyleHelper
-                                    .instance.body14RegularOpenSans
-                                    .copyWith(height: 1.43),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                ],
-              ),
-            );
-          }),
-
-          // Action Items section
-          Obx(() {
-            final actionItems = controller.actionItems;
-            if (actionItems.isEmpty) return SizedBox.shrink();
-
-            return Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(16.h),
-              decoration: BoxDecoration(
-                color: appTheme.white_A700,
-                borderRadius: BorderRadius.circular(8.h),
-                border: Border.all(color: appTheme.gray_300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 12.h,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.task_alt,
-                        color: appTheme.accentTeal,
-                        size: 20.h,
-                      ),
-                      SizedBox(width: 8.h),
-                      Text(
-                        'Action Items',
-                        style: TextStyleHelper.instance.title16SemiBoldOpenSans
-                            .copyWith(color: appTheme.accentTeal),
-                      ),
-                    ],
-                  ),
-                  ...actionItems.map((item) => Padding(
-                        padding: EdgeInsets.only(left: 8.h, bottom: 4.h),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.check_box_outline_blank,
-                              color: appTheme.accentTeal,
-                              size: 16.h,
-                            ),
-                            SizedBox(width: 8.h),
-                            Expanded(
-                              child: Text(
-                                item,
-                                style: TextStyleHelper
-                                    .instance.body14RegularOpenSans
-                                    .copyWith(height: 1.43),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                ],
-              ),
-            );
-          }),
-
-          // Transcript section with collapsible panel
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: appTheme.white_A700,
-              borderRadius: BorderRadius.circular(8.h),
-              border: Border.all(color: appTheme.gray_300),
-            ),
-            child: Theme(
-              data: ThemeData(
-                dividerColor: Colors.transparent,
-              ),
-              child: ExpansionTile(
-                title: Row(
-                  children: [
-                    Icon(
-                      Icons.help_outline,
-                      color: appTheme.gray_700,
-                      size: 20.h,
-                    ),
-                    SizedBox(width: 8.h),
-                    Text(
-                      'Transcript (raw)',
-                      style: TextStyleHelper.instance.title16SemiBoldOpenSans
-                          .copyWith(color: appTheme.gray_700),
-                    ),
-                  ],
-                ),
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16.h),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(12.h),
-                          decoration: BoxDecoration(
-                            color: appTheme.gray_50,
-                            borderRadius: BorderRadius.circular(6.h),
-                          ),
-                          child: Obx(() => Text(
-                                controller.rawTranscriptJson,
-                                style: TextStyleHelper
-                                    .instance.body12RegularOpenSans
-                                    .copyWith(fontFamily: 'monospace'),
-                              )),
-                        ),
-                        SizedBox(height: 12.h),
-                        ElevatedButton(
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(
-                                text: controller.rawTranscriptJson));
-                            Get.snackbar(
-                              'Copied',
-                              'Transcript copied to clipboard',
-                              snackPosition: SnackPosition.BOTTOM,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: appTheme.gray_700,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 20.h,
-                              vertical: 8.h,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.copy,
-                                color: appTheme.white_A700,
-                                size: 16.h,
-                              ),
-                              SizedBox(width: 8.h),
-                              Text(
-                                'Copy Transcript',
-                                style: TextStyleHelper
-                                    .instance.body14RegularOpenSans
-                                    .copyWith(color: appTheme.white_A700),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Action buttons
-          _buildActionChipsSection(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionChipsSection() {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 16.h),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildActionChip(
-            'Copy All',
-            Icons.copy,
-            () => _copyAll(),
-          ),
-          _buildActionChip(
-            'Share',
-            Icons.share,
-            () => _exportShare(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionChip(String label, IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
-        decoration: BoxDecoration(
-          color: appTheme.primary,
-          borderRadius: BorderRadius.circular(8.h),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 8.h,
-          children: [
-            Icon(
-              icon,
-              color: appTheme.white_A700,
-              size: 16.h,
-            ),
-            Text(
-              label,
-              style: TextStyleHelper.instance.body14SemiBoldOpenSans
-                  .copyWith(color: appTheme.white_A700),
+          AppSpacing.v(context, 0.5),
+          Text(shown),
+          if (widget.text.length > widget.previewChars) ...[
+            AppSpacing.v(context, 0.5),
+            TextButton(
+              onPressed: () => setState(() => expanded = !expanded),
+              child: Text(expanded ? 'Collapse' : 'Expand'),
             ),
           ],
-        ),
+        ],
       ),
     );
-  }
-
-  void _copyAll() {
-    final summary = controller.summaryText;
-    final keyPoints = controller.keyPoints.join('\nâ€¢ ');
-    final actionItems = controller.actionItems.join('\nâ€¢ ');
-
-    String combinedText = 'Summary:\n$summary\n\n';
-
-    if (keyPoints.isNotEmpty) {
-      combinedText += 'Key Points:\nâ€¢ $keyPoints\n\n';
-    }
-
-    if (actionItems.isNotEmpty) {
-      combinedText += 'Action Items:\nâ€¢ $actionItems\n\n';
-    }
-
-    combinedText += 'Transcript:\n${controller.rawTranscriptJson}';
-
-    Clipboard.setData(ClipboardData(text: combinedText));
-    Get.snackbar(
-      'Copied',
-      'All content copied to clipboard',
-      snackPosition: SnackPosition.BOTTOM,
-    );
-  }
-
-  void _exportShare() {
-    final summary = controller.summaryText;
-    final keyPoints = controller.keyPoints.join('\nâ€¢ ');
-    final actionItems = controller.actionItems.join('\nâ€¢ ');
-
-    String shareText = 'Recording Summary:\n$summary\n\n';
-
-    if (keyPoints.isNotEmpty) {
-      shareText += 'Key Points:\nâ€¢ $keyPoints\n\n';
-    }
-
-    if (actionItems.isNotEmpty) {
-      shareText += 'Action Items:\nâ€¢ $actionItems';
-    }
-
-    Share.share(shareText, subject: 'Recording Summary');
   }
 }

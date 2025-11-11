@@ -12,6 +12,7 @@ class AppThemeData {
       primary: appTheme.brandDeepPurple,
       secondary: appTheme.brandLavender,
       background: appTheme.brandSoftWhite,
+      surface: appTheme.brandSoftWhite,
     );
     final helper = TextStyleHelper.instance;
 
@@ -34,7 +35,7 @@ class AppThemeData {
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: cs.background,
+        backgroundColor: cs.surface,
         foregroundColor: appTheme.textPrimaryDark,
         titleTextStyle: helper.title18BoldQuattrocento,
         surfaceTintColor: Colors.transparent,
@@ -103,6 +104,22 @@ class AppThemeData {
         selectedLabelStyle: helper.body12RegularOpenSans,
         unselectedLabelStyle: helper.body12RegularOpenSans,
       ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: cs.secondaryContainer,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return helper.body12RegularOpenSans.copyWith(color: cs.primary);
+          }
+          return helper.body12RegularOpenSans.copyWith(color: appTheme.gray_500);
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: cs.primary);
+          }
+          return IconThemeData(color: appTheme.gray_500);
+        }),
+      ),
     );
   }
 
@@ -113,6 +130,7 @@ class AppThemeData {
       primary: appTheme.brandDeepPurple,
       secondary: appTheme.brandLavender,
       background: appTheme.slate_900,
+      surface: appTheme.slate_900,
     );
     final helper = TextStyleHelper.instance;
 
@@ -140,7 +158,7 @@ class AppThemeData {
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: appTheme.ink,
+        backgroundColor: cs.surface,
         foregroundColor: Colors.white,
         titleTextStyle:
             helper.title18BoldQuattrocento.copyWith(color: Colors.white),
@@ -205,6 +223,22 @@ class AppThemeData {
             helper.body12RegularOpenSans.copyWith(color: Colors.white),
         unselectedLabelStyle:
             helper.body12RegularOpenSans.copyWith(color: Colors.white70),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF121219),
+        indicatorColor: cs.secondaryContainer,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return helper.body12RegularOpenSans.copyWith(color: cs.primary);
+          }
+          return helper.body12RegularOpenSans.copyWith(color: Colors.white54);
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: cs.primary);
+          }
+          return IconThemeData(color: Colors.white54);
+        }),
       ),
     );
   }

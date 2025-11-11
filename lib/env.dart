@@ -29,4 +29,24 @@ class Env {
   static String get assemblyKey => _get('ASSEMBLYAI_API_KEY') ?? '';
   static String get openaiKey => _get('OPENAI_API_KEY') ?? '';
   static String get openrouterKey => _get('OPENROUTER_API_KEY') ?? '';
+
+  // Feature flags
+  static bool get redactionEnabled => _get('REDACTION_ENABLED')?.toLowerCase() == 'true';
+  static bool get demoMode => _get('DEMO_MODE')?.toLowerCase() == 'true';
+  
+  // PDF generation
+  static bool get serverSidePdf {
+    final value = _data['SVN_SERVER_SIDE_PDF'];
+    if (value is bool) return value;
+    if (value is String) return value.toLowerCase() == 'true';
+    return false; // default
+  }
+
+  // Development auth constants
+  static const bool DEV_AUTO_AUTH = true; // false in production builds
+  static const String DEV_EMAIL = 'dev@smartvoicenotes.local';
+  static const String DEV_PASSWORD = 'devpass-CHANGE-ME';
+
+  // Summarizer engine toggle
+  static const String SUMMARY_ENGINE = 'openai'; // 'lite' or 'openai'
 }

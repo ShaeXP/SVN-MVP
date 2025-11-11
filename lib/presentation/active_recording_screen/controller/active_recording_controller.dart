@@ -3,6 +3,7 @@ import 'package:lashae_s_application/core/app_export.dart';
 import 'package:get/get.dart';
 import 'dart:async';
 import 'dart:io';
+import '../../../app/routes/recording_details_args.dart';
 
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -12,7 +13,6 @@ import 'package:record/record.dart';
 import '../../../core/app_export.dart';
 import '../../../services/pipeline.dart';
 import '../../../services/supabase_service.dart';
-import 'package:lashae_s_application/bootstrap_supabase.dart';
 
 // lib/presentation/active_recording_screen/controller/active_recording_controller.dart
 
@@ -117,7 +117,7 @@ class ActiveRecordingController extends GetxController {
       _toast('No audio to save.');
       return;
     }
-    final user = Supa.client.auth.currentUser;
+    final user = SupabaseService.instance.client.auth.currentUser;
     if (user == null) {
       _toast('Please sign in to save.');
       return;
@@ -146,9 +146,9 @@ class ActiveRecordingController extends GetxController {
 
       await _pipeline.startAsr(runId, storagePath);
 
-      Get.offAllNamed(
-        Routes.recordingSummaryScreen,
-        arguments: {'run_id': runId},
+      Get.toNamed(
+        Routes.recordingSummary,
+        arguments: RecordingDetailsArgs(runId),
       );
       _toast('Saved to library');
     } catch (e) {

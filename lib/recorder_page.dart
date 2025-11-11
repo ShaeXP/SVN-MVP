@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 
-import 'package:lashae_s_application/bootstrap_supabase.dart';
+import 'package:lashae_s_application/services/supabase_service.dart';
 import 'package:lashae_s_application/services/recorder_service.dart';
 import 'package:lashae_s_application/services/supabase_upload.dart';
 import 'package:lashae_s_application/services/playback_service.dart';
@@ -58,8 +58,7 @@ class _RecorderPageState extends State<RecorderPage> {
       if (email.isEmpty || pw.isEmpty) {
         throw Exception('Enter email and password');
       }
-      final resp =
-          await Supa.client.auth.signInWithPassword(email: email, password: pw);
+      final resp = await SupabaseService.instance.client.auth.signInWithPassword(email: email, password: pw);
       if (resp.user == null) throw Exception('Sign-in failed');
       setState(() => _authMsg = 'Signed in as ${resp.user!.email}');
       await _refreshList();
@@ -69,7 +68,7 @@ class _RecorderPageState extends State<RecorderPage> {
   }
 
   Future<void> _ensureLoggedIn() async {
-    if (Supa.client.auth.currentUser == null) {
+    if (SupabaseService.instance.client.auth.currentUser == null) {
       throw Exception('Not authenticated. Sign in below first.');
     }
   }
@@ -193,7 +192,7 @@ class _RecorderPageState extends State<RecorderPage> {
   @override
   Widget build(BuildContext context) {
     final isRecording = _status == 'recording';
-    final user = Supa.client.auth.currentUser;
+    final user = SupabaseService.instance.client.auth.currentUser;
     final hasLast = _lastStoragePath != null && _lastRunId != null;
 
     return Scaffold(
@@ -289,7 +288,7 @@ class _RecorderPageState extends State<RecorderPage> {
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: () async {
-                    await Supa.client.auth.signOut();
+                    await SupabaseService.instance.client.auth.signOut();
                     setState(() {
                       _authMsg = 'Signed out';
                       _lastStoragePath = null;

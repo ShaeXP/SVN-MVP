@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sizer/sizer.dart';
 import 'package:lashae_s_application/core/app_export.dart';
 import 'package:lashae_s_application/core/utils/image_constant.dart';
 import 'package:lashae_s_application/theme/app_theme.dart';
@@ -19,100 +20,105 @@ import './custom_image_view.dart';
 class CustomBottomBar extends StatelessWidget {
   CustomBottomBar({
     Key? key,
-    this.selectedIndex = 0,
+    required this.selectedIndex,
     required this.onChanged,
     this.backgroundColor,
-    this.hasShadow,
+    this.hasShadow = false,
     this.iconSize,
   }) : super(key: key);
 
-  /// Currently selected tab index
   final int selectedIndex;
-
-  /// Callback function triggered when a bottom bar item is tapped
-  final Function(int) onChanged;
-
-  /// Background color of the bottom bar
+  final ValueChanged<int> onChanged;
   final Color? backgroundColor;
-
-  /// Whether to show shadow effect
-  final bool? hasShadow;
-
-  /// Size of the navigation icons
+  final bool hasShadow;
   final double? iconSize;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: backgroundColor ?? appTheme.whiteCustom,
-        boxShadow: (hasShadow ?? true)
+        color: backgroundColor ?? Colors.transparent,
+        boxShadow: hasShadow
             ? [
                 BoxShadow(
-                  color: appTheme.color1F3817,
-                  offset: Offset(0, 8.h),
-                  blurRadius: 13.h,
-                  spreadRadius: 0,
+                  color: appTheme.color281E12.withOpacity(0.1),
+                  offset: const Offset(0, 8.0),
+                  blurRadius: 13.0,
                 ),
               ]
             : null,
       ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 42.h,
-          vertical: 14.h,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildNavItem(0, "Record", ImageConstant.imgNavRecord),
-            _buildNavItem(1, "Library", ImageConstant.imgNavLibrary),
-            _buildNavItem(2, "Account", ImageConstant.imgNavAccount),
-          ],
+      child: SafeArea(
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 42.w,
+            vertical: 14.0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                index: 0,
+                icon: ImageConstant.imgNavRecord,
+                activeIcon: ImageConstant.imgNavRecord,
+                label: 'Record',
+              ),
+              _buildNavItem(
+                index: 1,
+                icon: ImageConstant.imgNavLibrary,
+                activeIcon: ImageConstant.imgNavLibraryBlue20001,
+                label: 'Library',
+              ),
+              _buildNavItem(
+                index: 2,
+                icon: ImageConstant.imgNavAccount,
+                activeIcon: ImageConstant.imgNavAccount,
+                label: 'Settings',
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, String title, String iconPath) {
-    final bool isSelected = selectedIndex == index;
-
-    return InkWell(
+  Widget _buildNavItem({
+    required int index,
+    required String icon,
+    required String activeIcon,
+    required String label,
+  }) {
+    final isSelected = selectedIndex == index;
+    
+    return GestureDetector(
       onTap: () => onChanged(index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CustomImageView(
-            imagePath: _getIconPath(iconPath, isSelected),
-            height: iconSize ?? 20.h,
-            width: iconSize ?? 20.h,
+          Container(
+            height: iconSize ?? 24.0,
+            width: iconSize ?? 24.0,
+            child: CustomImageView(
+              imagePath: isSelected ? activeIcon : icon,
+              height: iconSize ?? 24.0,
+              width: iconSize ?? 24.0,
+            ),
           ),
           SizedBox(height: 4.h),
           Text(
-            title,
-            style: TextStyleHelper.instance.label10OpenSans.copyWith(
-                color: isSelected ? Color(0xFF88CAF5) : appTheme.gray_700,
-                height: 1.4),
+            label,
+            style: isSelected
+                ? TextStyleHelper.instance.body12RegularOpenSans.copyWith(
+                    color: const Color(0xFF6E56CF),   // brand violet
+                    fontWeight: FontWeight.w600,
+                  )
+                : TextStyleHelper.instance.body12RegularOpenSans.copyWith(
+                    color: const Color(0x994B5563), // soft gray/violet
+                    fontWeight: FontWeight.w500,
+                  ),
           ),
         ],
       ),
     );
-  }
-
-  String _getIconPath(String basePath, bool isSelected) {
-    if (!isSelected) {
-      // For non-selected states, check if we need gray variant
-      if (basePath.contains("record")) {
-        return "assets/images/img_nav_record_gray_700.svg";
-      }
-      return basePath;
-    }
-
-    // For selected states, check if we need blue variant
-    if (basePath.contains("library") && isSelected) {
-      return "assets/images/img_nav_library_blue_200_01.svg";
-    }
-
-    return basePath;
   }
 }

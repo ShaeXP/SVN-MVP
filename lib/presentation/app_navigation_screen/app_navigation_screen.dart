@@ -29,73 +29,73 @@ class AppNavigationScreen extends GetWidget<AppNavigationController> {
                         context,
                         screenTitle: "Home_paused",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.recordingPausedScreen),
+                            context, Routes.recordingPaused),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Home_ready",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.recordingReadyScreen),
+                            context, Routes.recordingReady),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Home_recording",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.activeRecordingScreen),
+                            context, Routes.activeRecording),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Summary",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.recordingSummaryScreen),
+                            context, Routes.recordingSummary),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Register",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, Routes.loginScreen),
+                            onTapScreenTitle(context, Routes.login),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Home_idle",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, Routes.homeScreen),
+                            onTapScreenTitle(context, Routes.home),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Recording_options",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.activeRecordingScreen),
+                            context, Routes.activeRecording),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Recording_success",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.recordingSuccessScreen),
+                            context, Routes.recordingSummary),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Login Success",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.loginSuccessScreen),
+                            context, Routes.home),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Login",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, Routes.loginScreen),
+                            onTapScreenTitle(context, Routes.login),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Library",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, Routes.recordingLibraryScreen),
+                            context, Routes.recordingLibrary),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Account",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, Routes.settingsScreen),
+                            onTapScreenTitle(context, Routes.settings),
                       ),
                     ],
                   ),

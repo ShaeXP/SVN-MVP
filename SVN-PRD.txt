@@ -1,0 +1,210 @@
+Product
+SmartVoiceNotes (SVN) is a secure, AI-powered voice note + meeting assistant. It records or ingests audio, transcribes with Deepgram, summarizes with OpenAI, and stores results under strict RLS in Supabase.
+
+Primary users
+
+Solo founders/creators who need fast, trustworthy notes.
+
+Knowledge workers who want useful summaries from Zoom/Teams files.
+
+Outcomes (MVP)
+
+Capture ideas/meetings without friction.
+
+Retrieve a clean summary with action items within seconds.
+
+Trust that data is private and stored per-user (RLS).
+
+Non-Goals (MVP)
+
+Realtime multi-speaker diarization UX, calendar integrations, sharing/teams, complex editing. No experiments that threaten stability or budget.
+
+Key flows
+
+Record Flow
+
+Home → Start recording (permission gate) → Active Recording Screen with live waveform + timer.
+
+Pause/Resume → Stop → Recording Ready Screen → Confirm save.
+
+Pipeline runs: upload → transcribe (Deepgram via Edge) → summarize (OpenAI via Edge) → persist → Recording Summary Screen.
+
+Upload Flow
+
+Home/Upload entry → file picker → validate (≤60min for MVP, supported codecs) → same pipeline → Summary Screen.
+
+Library Flow
+
+Recording Library Screen lists user’s recordings (title, created_at, duration, status). Tapping opens Summary Screen; play controls available.
+
+Settings Flow
+
+Settings Screen displays read-only environment info, sign-out, basic theme toggle (optional). No provider keys shown.
+
+Success criteria
+
+TTFN (time-to-first-notes) ≤ 30s for a 2–3 min clip on decent network.
+
+Pipeline reliability ≥ 95% success (client-visible).
+
+Crash-free sessions ≥ 99% on MVP cohort.
+
+Per-recording traceId logs exist through pipeline for diagnostics.
+
+Screens & routes (must match code)
+
+/ → HomeScreen
+
+/home → HomeScreen
+
+/settings → SettingsScreen
+
+/recording-library → RecordingLibraryScreen
+
+/recording-summary → RecordingSummaryScreen
+
+/recording-ready → RecordingReadyScreenInitialPage (keep name; don’t rename)
+
+/login → LoginScreen
+
+/active-recording → ActiveRecordingScreen
+
+/recording-paused → RecordingPausedScreen
+
+UI requirements
+
+Persistent bottom nav in main_navigation shell (Home, Record, Library, Settings). All screens render inside the shell (no duplicate app bars).
+
+Live waveform during recording. If amplitude stream not available, show animated placeholder but do not block recording.
+
+Data contracts (client-side invariants; do not alter DB)
+
+Recording (client model): id, userId, createdAt, durationSec, status (local|uploading|transcribing|summarizing|ready|error), storagePath, transcriptId?, summaryId?.
+
+Summary (client model): id, recordingId, title, summary, bullets[], actionItems[], tags[], confidence.
+
+Storage path rule: recordings/{userId}/{yyyy}/{MM}/{dd}/{uuid}.m4a.
+
+Security
+
+RLS enforced for all tables. Client uses anon key only.
+
+Deepgram/OpenAI keys live in Edge functions. Never ship them to client.
+
+On failure, Edge returns generic messages; details stay server logs.
+
+Edge cases
+
+Permission denied → show one-tap “Grant Microphone Access” and link to Settings.
+
+Background/kill during upload → resume at app launch using local queue (idempotent).
+
+Network loss → backoff + resume; status shows “Waiting for network”.
+
+Oversized/unsupported file → fail fast with friendly copy.
+
+Analytics/logging
+
+Client logs: logx('[STEP] message', tag:'PIPELINE').
+
+Attach traceId to pipeline start and propagate to server calls.
+
+Accessibility
+
+Minimum tap target 44dp. Headline/body font pairing per brand. Maintain contrast on dark surfaces.
+
+Scalability (later)
+
+Speaker diarization UI, share/export, Slack/Email pushes, search across notes.
+
+Route & Import Fixups Cursor Must Enforce
+
+Imports in lib/app/routes/app_pages.dart must reference real files.
+Cursor should find the actual widget files in these folders and correct imports without renaming files:
+
+presentation/home_screen/home_screen.dart
+
+presentation/settings_screen/settings_screen.dart
+
+presentation/recording_library_screen/recording_library_screen.dart
+
+presentation/recording_summary_screen/recording_summary_screen.dart
+
+presentation/recording_ready_screen/recording_ready_screen_initial_page.dart
+
+presentation/login_screen/login_screen.dart
+
+presentation/active_recording_screen/active_recording_screen.dart
+
+presentation/recording_paused_screen/recording_paused_screen.dart
+
+Keep AppPages.pages aligned with Routes constants from your screenshot. If a file is missing, do not create a new screen — point to the existing one with the closest match and comment the mismatch.
+
+Real-time waveform plan (no new deps)
+
+Policy: implement with the recorder’s amplitude polling first. Only propose a new package if amplitude is impossible.
+
+Implementation pattern (Cursor can patch into recorder_service + active_recording_screen):
+
+Start recording.
+
+Start a Timer.periodic(const Duration(milliseconds: 80)) that calls recorder.getAmplitude() (or equivalent), push value to a StreamController<double>.
+
+ActiveRecordingScreen listens and animates a simple bezier/polyline or a bar visualization.
+
+Fallback: if getAmplitude unsupported, emit 0.5 + 0.5*sin(t) to keep the UI lively.
+
+Lightweight logger helper (approved options)
+
+Option 0 (no new file): add at top of any service you touch:
+
+import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
+
+void logx(String msg, {String tag = 'SVN', Object? error, StackTrace? stack}) {
+  if (!kReleaseMode) dev.log(msg, name: tag, error: error, stackTrace: stack);
+}
+
+
+Option A (if a single new file is allowed): create lib/services/logger.dart with the same function and import it where needed. Nothing fancier.
+
+analysis_options.yaml (strict but humane)
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    always_declare_return_types: true
+    avoid_dynamic_calls: true
+    avoid_print: true
+    cancel_subscriptions: true
+    close_sinks: true
+    directives_ordering: true
+    eol_at_end_of_file: true
+    no_logic_in_create_state: true
+    prefer_const_constructors: true
+    prefer_final_locals: true
+    prefer_relative_imports: true
+    sized_box_for_whitespace: true
+    unnecessary_lambdas: true
+    use_full_hex_values_for_flutter_colors: true
+
+analyzer:
+  exclude:
+    - '**/*.g.dart'
+  errors:
+    invalid_use_of_visible_for_testing_member: warning
+    invalid_use_of_protected_member: warning
+
+What Cursor should do next (diff-only, no deletions)
+
+Fix app_pages.dart imports to the actual file paths (no renames). Keep AppPages.pages exactly matching Routes from your image.
+
+Wire main_navigation as the persistent shell with bottom nav and nested navigators; ensure Home/Library/Record/Settings routes render inside it (no duplicate app bars).
+
+Implement waveform sampling via recorder_service + stream to active_recording_screen. No new packages.
+
+Standardize controllers: each *_screen has one controller in the same folder or a shared one if already present; controllers only orchestrate services.
+
+Pipeline resilience: if app is backgrounded mid-upload/transcribe, resume on next launch using status in recording_store.
+
+Add logx helper (Option 0). Replace stray print/debugPrint with logx.

@@ -1,11 +1,14 @@
-import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/app/routes/app_routes.dart';
 // lib/presentation/recording_control_screen/controller/recording_control_controller.dart
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http; // Add this import
+import '../../../app/routes/recording_details_args.dart';
 import '../../../services/pipeline.dart';
+import '../../../services/pipeline_tracker.dart';
 import '../../../services/supabase_service.dart';
+import '../../../controllers/progress_controller.dart';
 
 /// Minimal stub to keep the legacy screen compiling.
 /// It does not touch the microphone or the `record` plugin.
@@ -25,6 +28,29 @@ class RecordingControlController extends GetxController {
   // Add recording data storage
   Uint8List? _audioFile;
   int? _durationMs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Listen for pipeline completion
+    ever(PipelineTracker.I.status, (PipeStage stage) {
+      if (stage == PipeStage.ready) {
+        // Pipeline complete - navigate to summary
+        final runId = PipelineTracker.I.recordingId.value;
+        if (runId != null) {
+          // Use Get.toNamed instead of Get.offAllNamed to avoid navigation conflicts
+          Get.toNamed(
+            Routes.recordingSummary,
+            arguments: RecordingDetailsArgs(runId),
+          );
+        }
+      } else if (stage == PipeStage.error) {
+        // Pipeline failed - reset states
+        isUploading.value = false;
+        isProcessing.value = false;
+      }
+    });
+  }
 
   void start() {
     currentState.value = RecState.recording;
@@ -66,15 +92,17 @@ class RecordingControlController extends GetxController {
       throw Exception('No recording data to save');
     }
 
-    final user = Supa.client.auth.currentUser;
+    final user = SupabaseService.instance.client.auth.currentUser;
     if (user == null) {
       throw Exception('Please sign in to save');
     }
 
     isUploading.value = true;
+    print('DEBUG: Starting upload, isUploading = ${isUploading.value}');
     try {
       final pipeline = Pipeline();
       final runId = await pipeline.initRun();
+      print('DEBUG: Got runId = $runId');
 
       // For web recordings, assume webm format
       final ext = '.webm';
@@ -91,13 +119,21 @@ class RecordingControlController extends GetxController {
 
       isUploading.value = false;
       isProcessing.value = true;
+      print('DEBUG: Upload complete, isProcessing = ${isProcessing.value}');
+
+      // Start pipeline tracking for real-time progress updates
+      final tracker = PipelineTracker.I;
+      tracker.start(runId, openHud: false); // Don't open HUD, just track progress
+      print('DEBUG: Started pipeline tracker for runId = $runId');
+      
+      // Also start the new progress controller for banner display
+      final progressController = Get.find<ProgressController>();
+      progressController.start(runId);
 
       await pipeline.startAsr(runId, storagePath);
 
-      Get.offAllNamed(
-        Routes.recordingSummaryScreen,
-        arguments: {'run_id': runId},
-      );
+      // Don't navigate immediately - let the progress indicator show
+      // The PipelineTracker will handle navigation when ready
     } catch (e) {
       isUploading.value = false;
       isProcessing.value = false;

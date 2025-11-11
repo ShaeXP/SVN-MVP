@@ -1,12 +1,12 @@
-import 'package:lashae_s_application/app/routes/app_pages.dart';
 import 'package:lashae_s_application/core/app_export.dart';
-import 'package:sizer/sizer.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-
-import '../../core/app_export.dart';
+import 'package:flutter/foundation.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../ui/widgets/unified_status_chip.dart';
+import '../../ui/widgets/pipeline_ring_lottie.dart';
+import '../../dev/dev_pipeline_sim.dart';
 import './controller/file_upload_controller.dart';
 
 class FileUploadScreen extends GetWidget<FileUploadController> {
@@ -23,6 +23,17 @@ class FileUploadScreen extends GetWidget<FileUploadController> {
           children: [
             // Custom header section
             _buildHeaderSection(),
+            
+            // Progress banner
+            Obx(() {
+              if (controller.currentRecordingId == null) {
+                return const SizedBox.shrink();
+              }
+              return SizedBox(
+                height: 80, // Give it a maximum height
+                child: UnifiedPipelineBanner(recordingId: controller.currentRecordingId!),
+              );
+            }),
 
             Expanded(
               child: SingleChildScrollView(
@@ -133,7 +144,7 @@ class FileUploadScreen extends GetWidget<FileUploadController> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 GestureDetector(
-                  onTap: () => Get.back(),
+                  onTap: () => Get.back(id: 1),
                   child: Icon(
                     Icons.arrow_back_ios,
                     color: appTheme.gray_700,
@@ -142,11 +153,24 @@ class FileUploadScreen extends GetWidget<FileUploadController> {
                 ),
                 Container(
                   margin: EdgeInsets.only(bottom: 4.h),
-                  child: Text(
-                    'Upload Audio',
-                    style: TextStyleHelper.instance.title18BoldQuattrocento
-                        .copyWith(height: 1.11),
-                  ),
+                  child: kDebugMode
+                      ? GestureDetector(
+                          onLongPress: () {
+                            if (controller.currentRecordingId != null) {
+                              devSimulatePipeline(controller.currentRecordingId!);
+                            }
+                          },
+                          child: Text(
+                            'Upload Audio',
+                            style: TextStyleHelper.instance.title18BoldQuattrocento
+                                .copyWith(height: 1.11),
+                          ),
+                        )
+                      : Text(
+                          'Upload Audio',
+                          style: TextStyleHelper.instance.title18BoldQuattrocento
+                              .copyWith(height: 1.11),
+                        ),
                 ),
                 CustomImageView(
                   imagePath: ImageConstant.imgIconBell,
@@ -202,18 +226,23 @@ class FileUploadScreen extends GetWidget<FileUploadController> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          if (controller.isUploading.value)
-                            CircularProgressIndicator(
-                              strokeWidth: 3.h,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  appTheme.blue_200_01),
-                            )
-                          else
-                            CustomImageView(
-                              imagePath: ImageConstant.imgUpload,
-                              height: 40.h,
-                              width: 40.h,
-                            ),
+                          Obx(() {
+                            print('DEBUG FILE UPLOAD UI: isUploading = ${controller.isUploading.value}');
+                            if (controller.isUploading.value) {
+                              print('DEBUG FILE UPLOAD UI: Showing progress indicator');
+                              return PipelineRingLottie(
+                                progress: controller.uploadProgressPercent.value / 100,
+                                stage: controller.uploadStage.value,
+                              );
+                            } else {
+                              print('DEBUG FILE UPLOAD UI: Showing upload icon');
+                              return CustomImageView(
+                                imagePath: ImageConstant.imgUpload,
+                                height: 40.h,
+                                width: 40.h,
+                              );
+                            }
+                          }),
                         ],
                       ),
                     ),
@@ -232,7 +261,9 @@ class FileUploadScreen extends GetWidget<FileUploadController> {
 
                     Text(
                       controller.isUploading.value
-                          ? controller.uploadProgress.value
+                          ? (controller.uploadProgress.value.isNotEmpty 
+                              ? controller.uploadProgress.value 
+                              : 'Processing...')
                           : 'Select .webm, .m4a, .wav, .mp3, or .aac files',
                       style: TextStyleHelper.instance.body14RegularOpenSans
                           .copyWith(
@@ -370,13 +401,13 @@ class FileUploadScreen extends GetWidget<FileUploadController> {
 
     switch (index) {
       case 0:
-        Get.toNamed(Routes.homeScreen);
+        Get.toNamed(Routes.home, id: 1);
         break;
       case 1:
-        Get.toNamed(Routes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibrary, id: 1);
         break;
       case 2:
-        Get.toNamed(Routes.settingsScreen);
+        Get.toNamed(Routes.settings, id: 1);
         break;
     }
   }

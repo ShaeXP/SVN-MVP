@@ -9,3 +9,4 @@
 /.idea/.wiseGPT/
 /ios/Podfile
 /pubspec.lock
+.cursor/

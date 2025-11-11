@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
+import 'package:get/get.dart'; // AUTH-GATE: Added for navigation
 
 import '../core/utils/preview_mode_detector.dart';
 import './supabase_service.dart';
+import './auth.dart';
 import 'package:lashae_s_application/bootstrap_supabase.dart';
+import '../app/routes/app_routes.dart'; // AUTH-GATE: Added for Routes.loginScreen
 
 class SummaryBackendService {
   static SummaryBackendService? _instance;
@@ -14,6 +17,15 @@ class SummaryBackendService {
       _instance ??= SummaryBackendService._();
 
   SummaryBackendService._();
+
+  // AUTH-GATE: Helper method to validate JWT and redirect if needed
+  String? _getValidJWT() {
+    final jwt = Supa.client.auth.currentSession?.accessToken;
+    if (jwt == null) {
+      Get.offAllNamed(Routes.login);
+    }
+    return jwt;
+  }
 
   static const String _svSummarizeRunUrl =
       'https://gnskowrijoouemlptrvr.functions.supabase.co/sv_summarize_run';
@@ -60,9 +72,18 @@ class SummaryBackendService {
     }
 
     try {
+      if (runId.isEmpty) {
+        throw Exception('Cannot fetch note run with empty runId');
+      }
+
       final client = Supa.client;
-      final response =
-          await client.from('note_runs').select().eq('id', runId).single();
+      final userId = await AuthX.requireUserId();
+      final response = await client
+          .from('note_runs')
+          .select()
+          .eq('id', runId)
+          .eq('user_id', userId)
+          .single();
 
       return Map<String, dynamic>.from(response);
     } catch (e) {
@@ -116,11 +137,17 @@ class SummaryBackendService {
     }
 
     try {
+      if (runId.isEmpty) {
+        throw Exception('Cannot fetch run events with empty runId');
+      }
+
       final client = Supa.client;
+      final userId = await AuthX.requireUserId();
       final response = await client
           .from('run_events')
           .select()
           .eq('run_id', runId)
+          .eq('user_id', userId)
           .order('created_at', ascending: true);
 
       return List<Map<String, dynamic>>.from(response);
@@ -203,11 +230,14 @@ class SummaryBackendService {
       final user = client.auth.currentUser;
       if (user == null) throw Exception('No authenticated user');
 
+      final jwt = _getValidJWT();
+      if (jwt == null) return null; // Already redirected to login
+
       final response = await http.post(
         Uri.parse(_svSummarizeRunUrl),
         headers: {
           'content-type': 'application/json',
-          'authorization': 'Bearer ${client.auth.currentSession?.accessToken}',
+          'authorization': 'Bearer $jwt',
         },
         body: jsonEncode({'run_id': runId}),
       );
@@ -240,11 +270,14 @@ class SummaryBackendService {
     try {
       final client = Supa.client;
 
+      final jwt = _getValidJWT();
+      if (jwt == null) return null; // Already redirected to login
+
       final response = await http.post(
         Uri.parse(_summarizeTranscriptUrl),
         headers: {
           'content-type': 'application/json',
-          'authorization': 'Bearer ${client.auth.currentSession?.accessToken}',
+          'authorization': 'Bearer $jwt',
         },
         body: jsonEncode({'transcript_text': transcriptText}),
       );
@@ -272,11 +305,14 @@ class SummaryBackendService {
     try {
       final client = Supa.client;
 
+      final jwt = _getValidJWT();
+      if (jwt == null) return null; // Already redirected to login
+
       final response = await http.post(
         Uri.parse(_svSignAudioDownloadUrl),
         headers: {
           'content-type': 'application/json',
-          'authorization': 'Bearer ${client.auth.currentSession?.accessToken}',
+          'authorization': 'Bearer $jwt',
         },
         body: jsonEncode({'storage_path': storagePath}),
       );
@@ -356,13 +392,16 @@ class SummaryBackendService {
 
     try {
       final client = Supa.client;
-      final user = client.auth.currentUser;
-      if (user == null) throw Exception('No authenticated user');
+      final userId = await AuthX.requireUserId();
+
+      if (audioUrl.isEmpty || transcriptText.isEmpty) {
+        throw Exception('audioUrl and transcriptText cannot be empty');
+      }
 
       final response = await client
           .from('transcripts')
           .insert({
-            'user_id': user.id,
+            'user_id': userId,
             'audio_url': audioUrl,
             'transcript': {'text': transcriptText},
             'summary': summary,

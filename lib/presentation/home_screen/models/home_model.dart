@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import '../../../core/app_export.dart';
 
 /// This class is used in the [HomeScreen] screen with GetX.
 

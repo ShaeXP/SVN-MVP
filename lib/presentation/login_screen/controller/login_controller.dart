@@ -3,9 +3,12 @@ import 'package:lashae_s_application/core/app_export.dart';
 import 'package:get/get.dart';
 // lib/presentation/login_screen/controller/login_controller.dart
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // LOGIN-FIRST: Added for direct Supabase auth
 import 'package:lashae_s_application/services/supabase_service.dart';
 import '../../../core/app_export.dart';
 import '../models/login_model.dart';
+import '../../../app/navigation/bottom_nav_controller.dart';
+import '../../home_screen/controller/home_controller.dart';
 
 class LoginController extends GetxController {
   // Form + fields
@@ -84,36 +87,41 @@ class LoginController extends GetxController {
 
     isLoading.value = true;
     try {
-      final response = await SupabaseService.instance.signIn(
+      final response = await Supabase.instance.client.auth.signInWithPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      debugPrint(
-        'LOGIN user=${SupabaseService.instance.client.auth.currentUser?.id}',
-      );
-
-      if (response.user != null) {
-        Get.offAllNamed(Routes.homeScreen);
-        Get.snackbar(
-          'Success',
-          'Welcome back!',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: appTheme.green_600,
-          colorText: appTheme.white_A700,
-        );
+      if (response.session != null) {
+        // Navigate to the shell (home tab)
+        Get.offAllNamed(Routes.root);
+        
+        // Temporary verification asserts
+        assert(Get.isRegistered<BottomNavController>(), 'BottomNavController not registered');
+        assert(Get.isRegistered<HomeController>(), 'HomeController not registered');
+      } else {
+        // Defensive: show inline error
+        _showError('Sign-in failed. No session returned.');
       }
-    } catch (error) {
-      Get.snackbar(
-        'Sign In Failed',
-        error.toString().replaceAll('Exception: Sign in failed: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: appTheme.red_400,
-        colorText: appTheme.white_A700,
-      );
+    } on AuthException catch (e) {
+      _showError(e.message);
+    } catch (e) {
+      _showError('Unexpected error. Please try again.');
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // LOGIN-FIRST: Show inline error instead of snackbar
+  void _showError(String message) {
+    // For now, use snackbar but this could be changed to inline error display
+    Get.snackbar(
+      'Sign In Failed',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: appTheme.red_400,
+      colorText: appTheme.white_A700,
+    );
   }
 
   Future<void> onSignUpPressed() async {
@@ -179,6 +187,6 @@ class LoginController extends GetxController {
   }
 
   void onCreateAccountTap() {
-    Get.toNamed(Routes.loginScreen);
+    Get.toNamed(Routes.login);
   }
 }

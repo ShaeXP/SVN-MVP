@@ -3,7 +3,11 @@ import 'package:lashae_s_application/bootstrap_supabase.dart';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
-import 'package:flutter/foundation.dart'; // for debugPrint
+import 'package:flutter/foundation.dart' show debugPrint;
+import '../env.dart';
+import 'auth.dart';
+import 'status_transition_service.dart';
+import 'logger.dart';
 
 /// Production pipeline wired to your Edge Functions:
 /// - sv_init_note_run
@@ -32,7 +36,7 @@ class Pipeline {
   /// 1) Create a run row via edge function; returns run id.
   Future<String> initRun() async {
     try {
-      final res = await Supabase.instance.client.functions.invoke(
+      final res = await _sp.functions.invoke(
         'sv_init_note_run',
         body: const {}, // keep whatever you were sending
       );
@@ -157,5 +161,74 @@ class Pipeline {
     // Generate signed URL for uploading
     final signedUrl = await storage.createSignedUploadUrl(storagePath);
     return signedUrl.signedUrl;
+  }
+
+  // ── Summarizer toggle ───────────────────────────────────────────────────────
+  // Uses Env.SUMMARY_ENGINE from env.dart
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Summarize a recording using the configured engine
+  static Future<void> summarizeRecording(String recordingId) async {
+    final userId = await AuthX.requireUserId();
+    
+    try {
+      logx('[PIPELINE] Starting summarization for recordingId: $recordingId, engine: ${Env.SUMMARY_ENGINE}', tag: 'PIPELINE');
+      
+      if (Env.SUMMARY_ENGINE == 'openai') {
+        final supabase = Supabase.instance.client;
+        final resp = await supabase.functions.invoke('sv_summarize_openai', body: { 'recordingId': recordingId });
+        if (resp.data == null || resp.status != 200) {
+          throw Exception('sv_summarize_openai failed: ${resp.data}');
+        }
+        
+        // Handle successful completion
+        await StatusTransitionService.handleSummarizationComplete(
+          recordingId: recordingId,
+          success: true,
+        );
+        
+      } else {
+        // existing summarize-lite path
+        await _summarizeLite(recordingId, userId);
+        
+        // Handle successful completion
+        await StatusTransitionService.handleSummarizationComplete(
+          recordingId: recordingId,
+          success: true,
+        );
+      }
+      
+      logx('[PIPELINE] Summarization completed successfully for recordingId: $recordingId', tag: 'PIPELINE');
+      
+    } catch (e) {
+      logx('[PIPELINE] Summarization failed for recordingId: $recordingId', tag: 'PIPELINE', error: e);
+      
+      // Handle error completion
+      await StatusTransitionService.handleSummarizationComplete(
+        recordingId: recordingId,
+        success: false,
+        errorMessage: e.toString(),
+      );
+      
+      rethrow;
+    }
+  }
+
+  /// Handle transcription completion and trigger summarization
+  static Future<void> handleTranscriptionComplete({
+    required String recordingId,
+    required String transcriptId,
+  }) async {
+    await StatusTransitionService.handleTranscriptionComplete(
+      recordingId: recordingId,
+      transcriptId: transcriptId,
+    );
+  }
+
+  /// Lightweight summarization fallback
+  static Future<void> _summarizeLite(String recordingId, String userId) async {
+    // TODO: Implement lite summarization logic
+    // This would call the existing summarize-lite function
+    debugPrint('Lite summarization not yet implemented for recording: $recordingId');
   }
 }

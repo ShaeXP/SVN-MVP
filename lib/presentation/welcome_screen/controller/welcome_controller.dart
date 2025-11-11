@@ -16,13 +16,13 @@ class WelcomeController extends GetxController {
   // btn_register â†’ Voice Recording Home
   void onGetStartedPressed() {
     // Navigate to Voice Recording Home (Home Screen) as specified
-    Get.toNamed(Routes.homeScreen);
+    Get.toNamed(Routes.root);
   }
 
   // btn_loginRedirect â†’ User Sign In
   void onSignInPressed() {
     // Navigate to User Sign In (Login Screen) as specified
-    Get.toNamed(Routes.loginScreen);
+    Get.toNamed(Routes.login);
   }
 
   @override

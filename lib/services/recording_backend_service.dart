@@ -1,280 +1,444 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-
-import './supabase_service.dart';
+import 'logger.dart';
+import 'db_schema_probe.dart';
 
 class RecordingBackendService {
-  static RecordingBackendService? _instance;
-  static RecordingBackendService get instance =>
-      _instance ??= RecordingBackendService._();
-
   RecordingBackendService._();
+  static final instance = RecordingBackendService._();
 
-  final SupabaseService _supabase = SupabaseService.instance;
-  final String _baseUrl =
-      'https://gnskowrijoouemlptrvr.supabase.co/functions/v1';
-  final String _anonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imduc2tvd3Jpam9vdWVtbHB0cnZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0Mjc1ODQsImV4cCI6MjA3MDAwMzU4NH0.V1RCUJ6Duf_5iHzkknF58gDS1Q6L8y5xAEnK29xfmsg';
+  final _sb = Supabase.instance.client;
+  final _uuid = const Uuid();
+  final _schemaProbe = DbSchemaProbe(Supabase.instance.client);
 
-  /// Complete recording backend flow as specified in requirements
-  Future<Map<String, dynamic>> processStopRecording({
-    required Uint8List recordingBlob,
-    required int durationMs,
-    String? existingRunId,
+  // ---- SAFE INSERT HELPER ----
+  Future<Map<String, dynamic>> safeInsertRecording({
+    required SupabaseClient supabase,
+    required Map<String, dynamic> payload,
+    required String traceId,
   }) async {
-    try {
-      debugPrint('ðŸŽ¤ Starting complete recording backend flow...');
+    // Remove nulls and known-problematic optional keys up-front
+    payload.removeWhere((k, v) => v == null);
+    if (payload.containsKey('title')) {
+      payload.remove('title');
+      debugPrint("[UPLOAD][$traceId] removed 'title' pre-insert");
+    }
 
-      // Step 1: Call sv_init_note_run to capture run_id
-      final String runId = existingRunId ?? await _initNoteRun();
-      debugPrint('âœ… Step 1: Got run_id = $runId');
-
-      // Step 2: Build storage_path with user/<currentUserId>/<run_id>.webm format
-      final currentUser = _supabase.currentUser;
-      if (currentUser == null) {
-        throw Exception('User not authenticated');
+    // Try up to 5 times; strip any unknown columns reported by PostgREST.
+    const maxTries = 5;
+    var tries = 0;
+    while (true) {
+      tries++;
+      try {
+        debugPrint("[UPLOAD][$traceId] payload keys=${payload.keys.toList()}");
+        // Minimal, schema-safe projection (avoid selecting optional columns)
+        return await supabase
+            .from('recordings')
+            .insert(payload)
+            .select('id,created_at,storage_path') // ← only guaranteed columns
+            .single();
+      } on PostgrestException catch (e) {
+        final msg = e.message ?? e.toString();
+        final m = RegExp(r"Could not find the '([A-Za-z0-9_]+)' column").firstMatch(msg);
+        if (m != null && tries < maxTries) {
+          final bad = m.group(1)!;
+          // Never strip required keys
+          if (bad == 'user_id' || bad == 'storage_path') rethrow;
+          if (payload.remove(bad) != null) {
+            debugPrint("[UPLOAD][$traceId] dropping '$bad' then retry ($tries/$maxTries)");
+            continue;
+          }
+        }
+        // Baseline scrub (one-time) if we hit an unknown column in SELECT or elsewhere
+        if (tries == 1) {
+          final safe = {'user_id','storage_path'}; // keep it ultra-minimal
+          payload.removeWhere((k, _) => !safe.contains(k));
+          debugPrint("[UPLOAD][$traceId] scrubbed to baseline keys=${payload.keys.toList()} and retrying");
+          continue;
+        }
+        rethrow;
       }
+    }
+  }
 
-      final String storagePath = 'user/${currentUser.id}/$runId.webm';
-      debugPrint('âœ… Step 2: Built storage_path = $storagePath');
+  // ---- MIME MAP ----
+  static String _contentTypeFor(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'm4a':
+      case 'mp4': // audio in mp4 container -> use audio/mp4
+        return 'audio/mp4';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'aac':
+        return 'audio/aac';
+      case 'caf':
+        return 'audio/x-caf';
+      case 'ogg':
+      case 'oga':
+        return 'audio/ogg';
+      case 'webm':
+        return 'audio/webm';
+      default:
+        // Block unknowns instead of uploading as octet-stream (bucket rejects it anyway)
+        throw UnsupportedError('Unsupported file type: .$ext');
+    }
+  }
 
-      // Step 3: Call sv_sign_audio_upload with { storage_path } to get signedUrl
-      final String signedUrl = await _getSignedUploadUrl(storagePath);
-      debugPrint('âœ… Step 3: Got signed URL for upload');
+  static String _sanitizeName(String name) {
+    // basic cleanup to avoid weird chars in object path
+    return name.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
+  }
 
-      // Step 4: Upload recorded blob via PUT signedUrl with correct Content-Type
-      await _uploadRecordingBlob(signedUrl, recordingBlob);
-      debugPrint('âœ… Step 4: Successfully uploaded recording blob');
+  /// Upload local audio file to bucket 'recordings'.
+  /// Returns storage_path like: recordings/<userId>/<uuid>-<filename.ext>
+  Future<String> uploadLocalAudio({
+    required String userId,
+    required File file,
+  }) async {
+    final baseName = file.uri.pathSegments.isNotEmpty
+        ? file.uri.pathSegments.last
+        : 'audio.m4a';
+    final safeName = _sanitizeName(baseName);
+    // object path should NOT include the bucket name
+    final objectPath = '$userId/${_uuid.v4()}-$safeName';
 
-      // Step 5: Insert/Upsert into public.recordings with uploaded status
-      final String recordingId = await _insertRecordingRow(
-        runId: runId,
-        userId: currentUser.id,
-        storagePath: storagePath,
-        durationMs: durationMs,
+    final contentType = _contentTypeFor(safeName);
+
+    final bytes = await file.readAsBytes();
+    final res = await _sb.storage
+        .from('recordings')
+        .uploadBinary(
+          objectPath,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: false,
+            contentType: contentType,
+          ),
+        );
+
+    if (res == null || res.isEmpty) {
+      throw Exception('Upload failed: empty response from storage');
+    }
+
+    logx('[UPLOAD] storage ok "$objectPath" ($contentType)', tag: 'UPLOAD');
+    // Return path INCLUDING bucket for your DB (bucket + object)
+    return 'recordings/$objectPath';
+  }
+
+  Future<String> upsertRecordingRow({
+    required String userId,
+    required String storagePath,
+    required String traceId,
+    String status = 'uploading',
+    int? durationSec,
+    String? uiTitle,
+    String? originalFilename,
+  }) async {
+    // Build minimal, schema-tolerant payload
+    final Map<String, dynamic> payload = {
+      'user_id': userId,
+      'storage_path': storagePath,
+      'trace_id': traceId,
+      'status': status,
+      if (originalFilename != null) 'original_filename': originalFilename,
+      'mime_type': 'audio/m4a',
+      if (durationSec != null) 'duration_sec': durationSec,
+      if (uiTitle != null) 'title': uiTitle,
+    };
+
+    debugPrint("[UPLOAD][$traceId] payload keys=${payload.keys.toList()}");
+    
+    final rec = await safeInsertRecording(
+      supabase: _sb,
+      payload: payload,
+      traceId: traceId,
+    );
+    
+    final id = rec['id'] as String;
+    debugPrint("[UPLOAD][$traceId] insert ok id=$id");
+    return id;
+  }
+
+  Future<void> setRecordingStatus({
+    required String recordingId,
+    required String userId,
+    required String status,
+    String? errorMsg,
+  }) async {
+    final upd = <String, dynamic>{
+      'status': status,
+      if (errorMsg != null) 'last_error': errorMsg,
+    };
+    // Remove nulls before update
+    upd.removeWhere((k, v) => v == null);
+    
+    try {
+      await _sb.from('recordings').update(upd).eq('id', recordingId).eq('user_id', userId);
+      logx('[DB] recording $recordingId status -> $status', tag: 'PIPE');
+    } catch (e) {
+      // If update fails due to missing columns, try with just the status
+      if (upd.containsKey('last_error')) {
+        try {
+          await _sb.from('recordings').update({'status': status}).eq('id', recordingId).eq('user_id', userId);
+          logx('[DB] recording $recordingId status -> $status (last_error column missing)', tag: 'PIPE');
+        } catch (_) {
+          logx('[DB] recording $recordingId status update failed', tag: 'PIPE');
+        }
+      }
+    }
+  }
+
+  Future<void> runSvPipeline({
+    required String recordingId,
+    required String storagePath,
+    String? runId,
+  }) async {
+    final trace = runId ?? '${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}-${_uuid.v1().substring(0, 6)}';
+    logx('[PIPELINE] Invoking sv_run_pipeline: rid=$recordingId, path=$storagePath, trace=$trace', tag: 'PIPE');
+
+    try {
+      final resp = await _sb.functions.invoke(
+        'sv_run_pipeline',
+        headers: {'x-trace-id': trace},
+        body: {
+          'recording_id': recordingId,
+          'storage_path': storagePath,
+          'run_id': trace,
+        },
       );
-      debugPrint('âœ… Step 5: Inserted recording row with ID = $recordingId');
 
-      // Step 6: Call sv_start_asr_job_user to start ASR job
-      await _startAsrJob(runId, storagePath);
-      debugPrint('âœ… Step 6: Started ASR job');
+      debugPrint('[UPLOAD][$trace] fn status=${resp.status}');
+      
+      if (resp.status >= 300) {
+        final err = resp.data is Map ? (resp.data['message']?.toString() ?? '') : resp.data?.toString() ?? '';
+        logx('[PIPELINE] sv_run_pipeline failed (${resp.status}): $err', tag: 'PIPE', error: err.isEmpty ? 'unknown' : err);
+        throw Exception('sv_run_pipeline failed (${resp.status}): ${err.isEmpty ? "No error message" : err}');
+      }
+      logx('[PIPELINE] sv_run_pipeline completed successfully', tag: 'PIPE');
+    } catch (e, stackTrace) {
+      logx('[PIPELINE] Exception during invoke: $e', tag: 'PIPE', error: e, stack: stackTrace);
+      rethrow;
+    }
+  }
 
+  /// Insert-then-upload sequence with proper error handling
+  Future<Map<String, dynamic>> insertThenUpload({
+    required File file,
+    required String userId,
+    int? durationSec,
+    String? uiTitle,
+  }) async {
+    final traceId = _uuid.v4().substring(0, 8);
+    
+    // Generate storage path and object name
+    final baseName = file.uri.pathSegments.isNotEmpty
+        ? file.uri.pathSegments.last
+        : 'audio.m4a';
+    final safeName = _sanitizeName(baseName);
+    final objectName = '$userId/${_uuid.v4()}-$safeName';
+    final storagePath = 'recordings/$objectName';
+    
+    try {
+      // Build minimal, schema-tolerant payload (only safe keys; nothing schema-changing)
+      final Map<String, dynamic> payload = {
+        'user_id': userId,                 // keep: RLS
+        'storage_path': objectName,        // keep: required for pipeline
+        'trace_id': traceId,               // optional; will be dropped if table lacks it
+        // Optional keys (will be auto-dropped if table doesn't have them):
+        'status': 'uploading',
+        'original_filename': baseName,
+        'mime_type': 'audio/m4a',
+        if (durationSec != null) 'duration_sec': durationSec,
+        if (uiTitle != null) 'title': uiTitle,  // <-- will be removed if schema lacks 'title'
+      };
+
+      debugPrint("[UPLOAD][$traceId] payload keys=${payload.keys.toList()}");
+      
+      // Step 1: Insert DB row first using safe insert helper
+      final rec = await safeInsertRecording(
+        supabase: _sb,
+        payload: payload,
+        traceId: traceId,
+      );
+
+      final recId = rec['id'] as String;
+      debugPrint("[UPLOAD][$traceId] insert ok id=$recId");
+      
+      // Step 2: Upload to storage
+      final bytes = await file.readAsBytes();
+      final uploadRes = await _sb.storage
+          .from('recordings')
+          .uploadBinary(objectName, bytes,
+            fileOptions: const FileOptions(contentType: 'audio/m4a', upsert: false));
+
+      if (uploadRes == null || uploadRes.isEmpty) {
+        // Update row to status='error' if that column exists
+        try {
+          await _sb.from('recordings').update({'status': 'error'}).eq('id', recId);
+        } catch (_) {
+          // Ignore if status column doesn't exist
+        }
+        return {
+          'success': false,
+          'error': 'Storage upload failed',
+          'message': 'Upload failed: storage upload failed',
+          'trace_id': traceId,
+        };
+      }
+      
+      debugPrint('[UPLOAD][$traceId] storage ok $objectName');
+      
+      // Step 3: Only after insert and storage upload succeed → show success and invoke pipeline
+      if (recId.isEmpty || storagePath.isEmpty) {
+        debugPrint('[UPLOAD][$traceId] missing required params: recId=$recId, storagePath=$storagePath');
+        return {
+          'success': false,
+          'error': 'Missing required parameters',
+          'message': 'Upload failed: missing recording ID or storage path',
+          'trace_id': traceId,
+        };
+      }
+      
+      final functionBody = {
+        'recording_id': recId,
+        'recordingId': recId, // fallback for camelCase
+        'storage_path': storagePath,
+        'storagePath': storagePath, // fallback for camelCase
+        'trace_id': traceId,
+        'traceId': traceId, // fallback for camelCase
+      };
+      debugPrint('[UPLOAD][$traceId] invoking pipeline with keys=${functionBody.keys.toList()}');
+      debugPrint('[UPLOAD][$traceId] function body values: recording_id=$recId, storage_path=$storagePath, trace_id=$traceId');
+      
+      final fn = await _sb.functions.invoke(
+        'sv_run_pipeline', 
+        body: functionBody,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-trace-id': traceId,
+        },
+      );
+
+      debugPrint('[UPLOAD][$traceId] fn status=${fn.status}');
+      debugPrint('[UPLOAD][$traceId] fn data=${fn.data}');
+
+      if ((fn.status ?? 500) >= 300) {
+        // Mark error if schema supports it
+        try {
+          await _sb.from('recordings').update({
+            'status': 'error',
+            'last_error': 'sv_run_pipeline ${fn.status}'
+          }).eq('id', recId);
+        } catch (_) {
+          // Ignore if status/last_error columns don't exist
+        }
+        return {
+          'success': false,
+          'error': 'Pipeline function failed',
+          'message': 'Upload completed but processing failed. Tap for details.',
+          'recording_id': recId,
+          'trace_id': traceId,
+        };
+      }
+      
+      // Success toast here (and ONLY here)
       return {
         'success': true,
-        'run_id': runId,
-        'recording_id': recordingId,
-        'storage_path': storagePath,
-        'message': 'Recording processed successfully'
+        'recording_id': recId,
+        'trace_id': traceId,
+        'message': 'Upload queued',
+      };
+      
+    } on PostgrestException catch (e) {
+      // On insert error (after retry): toast Upload failed (DB insert) and STOP
+      return {
+        'success': false,
+        'error': e.message,
+        'message': 'Upload failed (DB insert): ${e.message}',
+        'trace_id': traceId,
       };
     } catch (e) {
-      debugPrint('âŒ Recording backend flow failed: $e');
       return {
         'success': false,
         'error': e.toString(),
-        'message': 'Failed to process recording'
+        'message': 'Upload failed: ${e.toString()}',
+        'trace_id': traceId,
       };
     }
   }
 
-  /// Step 1: Initialize note run and get run_id
-  Future<String> _initNoteRun() async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/sv_init_note_run'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_anonKey',
-          'apikey': _anonKey,
-        },
-        body: jsonEncode({}),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to initialize note run: ${response.body}');
-      }
-
-      final data = jsonDecode(response.body);
-      return data['run_id'] ?? data['id'];
-    } catch (e) {
-      throw Exception('Error initializing note run: $e');
-    }
-  }
-
-  /// Step 3: Get signed upload URL from sv_sign_audio_upload
-  Future<String> _getSignedUploadUrl(String storagePath) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/sv_sign_audio_upload'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_anonKey',
-          'apikey': _anonKey,
-        },
-        body: jsonEncode({
-          'storage_path': storagePath,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to get signed URL: ${response.body}');
-      }
-
-      final data = jsonDecode(response.body);
-      return data['signedUrl'] ?? data['signed_url'] ?? data['url'];
-    } catch (e) {
-      throw Exception('Error getting signed upload URL: $e');
-    }
-  }
-
-  /// Step 4: Upload recording blob via PUT with correct Content-Type
-  Future<void> _uploadRecordingBlob(String signedUrl, Uint8List blob) async {
-    try {
-      final response = await http.put(
-        Uri.parse(signedUrl),
-        headers: {
-          'Content-Type': 'audio/webm',
-          'Cache-Control': 'max-age=3600',
-        },
-        body: blob,
-      );
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-            'Failed to upload recording: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Error uploading recording blob: $e');
-    }
-  }
-
-  /// Step 5: Insert/Upsert into public.recordings with uploaded status
-  Future<String> _insertRecordingRow({
-    required String runId,
+  Future<String> uploadAndRun({
+    required File file,
     required String userId,
-    required String storagePath,
+  }) async {
+    final result = await insertThenUpload(
+      file: file,
+      userId: userId,
+      uiTitle: 'Voice note ${DateTime.now().toIso8601String()}',
+    );
+    
+    if (result['success'] == true) {
+      return result['recording_id'] as String;
+    } else {
+      throw Exception(result['error'] ?? 'Upload failed');
+    }
+  }
+
+  /// Legacy method for backward compatibility with file_upload_service
+  /// Processes a recording blob by creating temp file
+  Future<Map<String, dynamic>> processStopRecording({
+    required List<int> recordingBlob,
     required int durationMs,
+    String fileName = 'recording.m4a',
   }) async {
     try {
-      final recordingId = const Uuid().v4();
-
-      final response = await _supabase.client
-          .from('recordings')
-          .upsert({
-            'id': recordingId,
-            'user_id': userId,
-            'run_id': runId,
-            'storage_path': storagePath,
-            'duration_ms': durationMs,
-            'status': 'uploaded',
-            'created_at': DateTime.now().toIso8601String(),
-          })
-          .select()
-          .single();
-
-      return response['id'];
-    } catch (e) {
-      throw Exception('Error inserting recording row: $e');
-    }
-  }
-
-  /// Step 6: Start ASR job with fallback to deepgram-transcribe
-  Future<void> _startAsrJob(String runId, String storagePath) async {
-    try {
-      // Try sv_start_asr_job_user first
-      final response = await http.post(
-        Uri.parse('$_baseUrl/sv_start_asr_job_user'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_anonKey',
-          'apikey': _anonKey,
-        },
-        body: jsonEncode({
-          'run_id': runId,
-          'storage_path': storagePath,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        debugPrint('âš ï¸ sv_start_asr_job_user failed, trying fallback...');
-        await _fallbackToDeepgramTranscribe(storagePath);
+      logx('[PROCESS] Starting processStopRecording: ${recordingBlob.length} bytes, fileName=$fileName', tag: 'UPLOAD');
+      
+      final userId = _sb.auth.currentUser?.id;
+      if (userId == null) {
+        logx('[PROCESS] Auth check failed - no user', tag: 'UPLOAD');
+        return {
+          'success': false,
+          'error': 'Not authenticated',
+          'message': 'User must be signed in to upload recordings'
+        };
       }
-    } catch (e) {
-      debugPrint('âš ï¸ ASR job failed, trying fallback: $e');
+      logx('[PROCESS] User authenticated: $userId', tag: 'UPLOAD');
+
+      // Create temporary file from blob
+      final tempDir = Directory.systemTemp;
+      final tempFile = File('${tempDir.path}/temp_recording_${DateTime.now().millisecondsSinceEpoch}_$fileName');
+      await tempFile.writeAsBytes(recordingBlob);
+
       try {
-        await _fallbackToDeepgramTranscribe(storagePath);
-      } catch (fallbackError) {
-        throw Exception('Both ASR methods failed: $e, $fallbackError');
+        // Use insert-then-upload sequence
+        logx('[PROCESS] Using insert-then-upload sequence...', tag: 'UPLOAD');
+        final result = await insertThenUpload(
+          file: tempFile,
+          userId: userId,
+          durationSec: (durationMs / 1000).round(),
+          uiTitle: 'Voice note ${DateTime.now().toIso8601String()}',
+        );
+
+        return result;
+      } finally {
+        // Clean up temp file
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
       }
-    }
-  }
-
-  /// Fallback to deepgram-transcribe if sv_start_asr_job_user is not available
-  Future<void> _fallbackToDeepgramTranscribe(String storagePath) async {
-    try {
-      // Build audio URL from storage path
-      final bucket = _getBucketFromStoragePath();
-      final audioUrl =
-          _supabase.client.storage.from(bucket).getPublicUrl(storagePath);
-
-      final response = await http.post(
-        Uri.parse('$_baseUrl/deepgram-transcribe'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_anonKey',
-          'apikey': _anonKey,
-        },
-        body: jsonEncode({
-          'audio_url': audioUrl,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Deepgram fallback failed: ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Deepgram transcription fallback failed: $e');
-    }
-  }
-
-  /// Determine storage bucket with fallback priority: recordings -> audio -> recording
-  String _getBucketFromStoragePath() {
-    // This matches the user's specified bucket priority
-    // In a real implementation, you might want to check bucket availability
-    return 'recordings'; // Primary bucket
-  }
-
-  /// Get recording status for UI updates
-  Future<Map<String, dynamic>?> getRecordingStatus(String runId) async {
-    try {
-      final response = await _supabase.client
-          .from('recordings')
-          .select('id, status, duration_ms, created_at, storage_path')
-          .eq('run_id', runId)
-          .maybeSingle();
-
-      return response;
-    } catch (e) {
-      debugPrint('Error getting recording status: $e');
-      return null;
-    }
-  }
-
-  /// Check if a run_id exists in note_runs table
-  Future<Map<String, dynamic>?> getRunStatus(String runId) async {
-    try {
-      final response = await _supabase.client
-          .from('note_runs')
-          .select('id, status, created_at, transcript_text, summary_v1')
-          .eq('id', runId)
-          .maybeSingle();
-
-      return response;
-    } catch (e) {
-      debugPrint('Error getting run status: $e');
-      return null;
+    } catch (e, stackTrace) {
+      logx('[PROCESS] processStopRecording error: $e', tag: 'UPLOAD', error: e, stack: stackTrace);
+      return {
+        'success': false,
+        'error': e.toString(),
+        'message': 'Failed to process recording: ${e.toString()}'
+      };
     }
   }
 }

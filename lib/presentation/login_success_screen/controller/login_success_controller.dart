@@ -16,7 +16,7 @@ class LoginSuccessController extends GetxController {
   // btn_continue â†’ Voice Recording Home
   void onContinuePressed() {
     // Navigate to Voice Recording Home (Home Screen) as specified
-    Get.offAllNamed(Routes.homeScreen);
+    Get.offAllNamed(Routes.root);
   }
 
   @override

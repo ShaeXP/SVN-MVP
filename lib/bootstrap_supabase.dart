@@ -4,7 +4,8 @@ import 'package:lashae_s_application/env.dart';
 /// Global access to a single Supabase client.
 class Supa {
   static bool _inited = false;
-  static late SupabaseClient client;
+  // Deterministic initialization - no 'late'
+  static SupabaseClient get client => Supabase.instance.client;
 
   /// Initialize once, before runApp.
   static Future<void> init() async {
@@ -24,7 +25,6 @@ class Supa {
       ),
     );
 
-    client = Supabase.instance.client;
     _inited = true;
 
     // Optional: observe auth events during development.

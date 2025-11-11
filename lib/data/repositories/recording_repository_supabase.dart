@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import '../../services/supabase_service.dart';
+import '../../services/auth.dart';
 import '../models/recording_item.dart';
 import './recording_repository.dart';
-import 'package:lashae_s_application/bootstrap_supabase.dart';
 
 class RecordingRepositorySupabase implements RecordingRepository {
   static final RecordingRepositorySupabase _instance =
@@ -16,10 +16,15 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<void> upsertMetadata(RecordingItem item) async {
     try {
-      final client = Supa.client;
+      final client = SupabaseService.instance.client;
+      final userId = await AuthX.requireUserId();
 
       // Map plain RecordingItem to Supabase row using plain Strings/Lists
-      await client.from('recordings').upsert(item.toSupabaseRecording());
+      final payload = item.toSupabaseRecording();
+      payload.removeWhere((k, v) => v == null);
+      payload.remove('title');
+      payload.remove('trace_id'); // optional key; schema may not have it
+      await client.from('recordings').upsert(payload).select('id,created_at,storage_path');
 
       // Handle actions and keypoints as plain Lists<String>
       if (item.actions.isNotEmpty || item.keypoints.isNotEmpty) {
@@ -28,10 +33,12 @@ class RecordingRepositorySupabase implements RecordingRepository {
             .from('notes')
             .select('id')
             .eq('recording_id', item.id)
+            .eq('user_id', userId)
             .maybeSingle();
 
         // Map to Supabase rows using plain Strings/Lists
         final noteData = {
+          'user_id': userId,
           'title': item.title, // Plain String
           'recording_id': item.id, // Plain String
           'transcript': item.transcript, // Plain String
@@ -45,7 +52,8 @@ class RecordingRepositorySupabase implements RecordingRepository {
           await client
               .from('notes')
               .update(noteData)
-              .eq('id', existingNote['id']);
+              .eq('id', existingNote['id'])
+              .eq('user_id', userId);
         } else {
           // Create new note
           await client.from('notes').insert(noteData);
@@ -59,7 +67,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<String> uploadAudio(String recordingId, File audioFile) async {
     try {
-      final client = Supa.client;
+      final client = SupabaseService.instance.client;
 
       // Plain String parameters only
       final filePath =
@@ -79,7 +87,8 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<List<RecordingItem>> fetchAll() async {
     try {
-      final client = Supa.client;
+      final client = SupabaseService.instance.client;
+      final userId = await AuthX.requireUserId();
 
       // Fetch recordings with related notes
       final response = await client.from('recordings').select('''
@@ -96,7 +105,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
               actions,
               highlights
             )
-          ''').order('created_at', ascending: false);
+          ''').eq('user_id', userId).order('created_at', ascending: false);
 
       // Map to plain RecordingItem objects
       return response
@@ -110,11 +119,16 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<void> delete(String id) async {
     try {
-      final client = Supa.client;
+      final client = SupabaseService.instance.client;
+      final userId = await AuthX.requireUserId();
+
+      if (id.isEmpty) {
+        throw Exception('Cannot delete recording with empty ID');
+      }
 
       // Plain String parameter only
-      await client.from('notes').delete().eq('recording_id', id);
-      await client.from('recordings').delete().eq('id', id);
+      await client.from('notes').delete().eq('recording_id', id).eq('user_id', userId);
+      await client.from('recordings').delete().eq('id', id).eq('user_id', userId);
 
       // Optional: Delete audio file from storage
       try {
@@ -138,7 +152,12 @@ class RecordingRepositorySupabase implements RecordingRepository {
   @override
   Future<RecordingItem?> getById(String id) async {
     try {
-      final client = Supa.client;
+      final client = SupabaseService.instance.client;
+      final userId = await AuthX.requireUserId();
+
+      if (id.isEmpty) {
+        throw Exception('Cannot get recording with empty ID');
+      }
 
       final response = await client.from('recordings').select('''
             id,
@@ -154,7 +173,7 @@ class RecordingRepositorySupabase implements RecordingRepository {
               actions,
               highlights
             )
-          ''').eq('id', id).maybeSingle();
+          ''').eq('id', id).eq('user_id', userId).maybeSingle();
 
       if (response != null) {
         // Return plain RecordingItem

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
 
 // correct relative path: from app/modules/pages -> up to lib/, then into presentation/...
 import '../../../presentation/home_screen/home_screen.dart';

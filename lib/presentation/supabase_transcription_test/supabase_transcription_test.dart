@@ -7,14 +7,14 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
-import 'package:lashae_s_application/bootstrap_supabase.dart';
+import '../../services/supabase_service.dart';
 
-final supabase = Supa.client;
+final supabase = SupabaseService.instance.client;
 
 const EDGE_FUNCTION_URL =
     'https://gnskowrijoouemlptrvr.functions.supabase.co/deepgram-transcribe';
 const SUPABASE_ANON_KEY =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imduc2tvd3Jpam9vdWVtbHB0cnZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0Mjc1ODQsImV4cCI6MjA3MDAwMzU4NH0.V1RCUJ6Duf_5iHzkknF58gDS1Q6L8y5xAEnK29xfmsg';
+    'sb_publishable_LhchOSgqgJp7lza44fB1eg_ye3V3uGS';
 
 class SupabaseTranscriptionTestScreen extends StatefulWidget {
   const SupabaseTranscriptionTestScreen({super.key});
@@ -192,7 +192,7 @@ class _SupabaseTranscriptionTestScreenState
         children: [
           Text(
             "Audio Transcription Test",
-            style: theme.textTheme.titleMedium!.copyWith(
+            style: Theme.of(context).textTheme.titleMedium!.copyWith(
               color: appTheme.cyan_900,
               fontWeight: FontWeight.w600,
             ),
@@ -200,7 +200,7 @@ class _SupabaseTranscriptionTestScreenState
           SizedBox(height: 8),
           Text(
             "Select an audio file to upload and transcribe using Supabase Edge Functions and Deepgram.",
-            style: theme.textTheme.bodyMedium!.copyWith(
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
               color: appTheme.gray_700,
               height: 1.4,
             ),
@@ -248,7 +248,7 @@ class _SupabaseTranscriptionTestScreenState
             SizedBox(width: 8.h),
             Text(
               isProcessing ? 'Processing...' : 'Pick & Transcribe Audio',
-              style: theme.textTheme.titleMedium!.copyWith(
+              style: Theme.of(context).textTheme.titleMedium!.copyWith(
                 color: appTheme.white_A700,
                 fontWeight: FontWeight.w600,
               ),
@@ -300,7 +300,7 @@ class _SupabaseTranscriptionTestScreenState
           Expanded(
             child: Text(
               'Status: $status',
-              style: theme.textTheme.bodyMedium!.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: statusColor,
                 fontWeight: FontWeight.w500,
               ),
@@ -335,7 +335,7 @@ class _SupabaseTranscriptionTestScreenState
           Expanded(
             child: Text(
               'Selected: $selectedFileName',
-              style: theme.textTheme.bodyMedium!.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: appTheme.gray_900,
                 fontWeight: FontWeight.w500,
               ),
@@ -373,7 +373,7 @@ class _SupabaseTranscriptionTestScreenState
               SizedBox(width: 8.h),
               Text(
                 'Audio URL:',
-                style: theme.textTheme.bodyMedium!.copyWith(
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   color: appTheme.cyan_900,
                   fontWeight: FontWeight.w600,
                 ),
@@ -383,7 +383,7 @@ class _SupabaseTranscriptionTestScreenState
           SizedBox(height: 4),
           Text(
             audioUrl!,
-            style: theme.textTheme.bodySmall!.copyWith(
+            style: Theme.of(context).textTheme.bodySmall!.copyWith(
               color: appTheme.gray_700,
               height: 1.3,
             ),
@@ -422,7 +422,7 @@ class _SupabaseTranscriptionTestScreenState
                 SizedBox(width: 8.h),
                 Text(
                   'Transcription Result:',
-                  style: theme.textTheme.titleMedium!.copyWith(
+                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
                     color: appTheme.gray_900,
                     fontWeight: FontWeight.w600,
                   ),
@@ -445,7 +445,7 @@ class _SupabaseTranscriptionTestScreenState
                 child: SingleChildScrollView(
                   child: Text(
                     const JsonEncoder.withIndent('  ').convert(result),
-                    style: theme.textTheme.bodySmall!.copyWith(
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
                       color: appTheme.gray_900_01,
                       fontFamily: 'monospace',
                       height: 1.4,

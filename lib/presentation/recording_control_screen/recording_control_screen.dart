@@ -1,16 +1,16 @@
-import 'package:lashae_s_application/app/routes/app_pages.dart';
 import 'package:lashae_s_application/core/app_export.dart';
-import 'package:sizer/sizer.dart';
 import 'package:get/get.dart';
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-
-import '../../core/app_export.dart';
+import 'package:flutter/foundation.dart';
 import '../../services/web_audio_recorder.dart';
+import '../../services/pipeline_tracker.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/pipeline_progress_indicator.dart';
+import '../../ui/widgets/unified_status_chip.dart';
+import '../../dev/dev_pipeline_sim.dart';
 import './controller/recording_control_controller.dart';
 
 // Add this import for Uint8List
@@ -77,16 +77,6 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
     return '$m:$s';
   }
 
-  /// Start timer
-  void _startTimer() {
-    _ticker?.cancel();
-    setState(() {
-      _elapsed = Duration.zero;
-    });
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _elapsed += const Duration(seconds: 1));
-    });
-  }
 
   /// Stop timer
   void _stopTimer() {
@@ -118,8 +108,10 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
       await _audioRecorder.startRecording();
 
       // Navigate to active recording screen with startedAt timestamp
+      // Use navigator id: 1 for Record tab's nested navigator
       Get.toNamed(
-        Routes.activeRecordingScreen,
+        Routes.activeRecording,
+        id: 1,
         arguments: {'startedAt': DateTime.now().toIso8601String()},
       );
     } catch (e) {
@@ -142,7 +134,8 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
     _clearError();
 
     // Navigate back to recording control in idle state
-    Get.offNamed(Routes.recordingControlScreen);
+    // Use navigator id: 1 for Record tab's nested navigator
+    Get.offNamed(Routes.recordingReady, id: 1);
   }
 
   /// Save action with gating
@@ -199,6 +192,16 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
+            // Progress banner
+            Obx(() {
+              if (PipelineTracker.I.recordingId.value == null) {
+                return const SizedBox.shrink();
+              }
+              return SizedBox(
+                height: 80, // Give it a maximum height
+                child: UnifiedPipelineBanner(recordingId: PipelineTracker.I.recordingId.value!),
+              );
+            }),
             // Main content section
             Align(
               alignment: Alignment.bottomCenter,
@@ -286,12 +289,26 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
                                 Spacer(),
                                 Container(
                                   margin: EdgeInsets.only(bottom: 4.h),
-                                  child: Text(
-                                    'Recorder',
-                                    style: TextStyleHelper
-                                        .instance.title18BoldQuattrocento
-                                        .copyWith(height: 1.11),
-                                  ),
+                                  child: kDebugMode
+                                      ? GestureDetector(
+                                          onLongPress: () {
+                                            if (PipelineTracker.I.recordingId.value != null) {
+                                              devSimulatePipeline(PipelineTracker.I.recordingId.value!);
+                                            }
+                                          },
+                                          child: Text(
+                                            'Recorder',
+                                            style: TextStyleHelper
+                                                .instance.title18BoldQuattrocento
+                                                .copyWith(height: 1.11),
+                                          ),
+                                        )
+                                      : Text(
+                                          'Recorder',
+                                          style: TextStyleHelper
+                                              .instance.title18BoldQuattrocento
+                                              .copyWith(height: 1.11),
+                                        ),
                                 ),
                                 Spacer(),
                                 CustomImageView(
@@ -414,13 +431,13 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
 
     switch (index) {
       case 0:
-        Get.toNamed(Routes.homeScreen);
+        Get.toNamed(Routes.home, id: 1);
         break;
       case 1:
-        Get.toNamed(Routes.recordingLibraryScreen);
+        Get.toNamed(Routes.recordingLibrary, id: 1);
         break;
       case 2:
-        Get.toNamed(Routes.settingsScreen);
+        Get.toNamed(Routes.settings, id: 1);
         break;
     }
   }
@@ -565,6 +582,22 @@ class _RecordingControlScreenState extends State<RecordingControlScreen> {
         ),
 
         SizedBox(height: 22.h),
+
+        // Progress indicator when processing
+        Obx(() {
+          print('DEBUG UI: isUploading = ${controller.isUploading.value}, isProcessing = ${controller.isProcessing.value}');
+          if (controller.isUploading.value || controller.isProcessing.value) {
+            print('DEBUG UI: Showing PipelineProgressIndicator');
+            return Column(
+              children: [
+                PipelineProgressIndicator(),
+                SizedBox(height: 24.h),
+              ],
+            );
+          }
+          print('DEBUG UI: Not showing progress indicator');
+          return SizedBox.shrink();
+        }),
 
         // Save button - enabled only if file != null && durationMs > 0
         Obx(() => Container(

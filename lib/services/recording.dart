@@ -13,6 +13,15 @@ class RecordingResult {
 abstract class RecordingService {
   Future<void> startRecording();
   Future<RecordingResult> stopRecording();
+  
+  /// Check if microphone permission is granted
+  Future<bool> hasMicPermission();
+  
+  /// Check if any input device is available
+  Future<bool> hasAnyInputDevice();
+  
+  /// Safe entry point to check if recording can proceed
+  Future<bool> canRecordNow();
 }
 
 /// Real recorder (device/emulator). Uses record v5 AudioRecorder API.
@@ -65,6 +74,25 @@ class RealRecordingService implements RecordingService {
 
     return RecordingResult(file: File(p), durationMs: dur);
   }
+
+  @override
+  Future<bool> hasMicPermission() async => await _rec.hasPermission();
+
+  @override
+  Future<bool> hasAnyInputDevice() async {
+    try {
+      final inputs = await _rec.listInputDevices();
+      return inputs != null && inputs.isNotEmpty;
+    } catch (e) {
+      // If listing devices fails, assume no devices available
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> canRecordNow() async {
+    return await hasMicPermission() && await hasAnyInputDevice();
+  }
 }
 
 /// Lightweight mock for previews/tests (does NOT ask permissions)
@@ -80,4 +108,13 @@ class MockRecordingService implements RecordingService {
     await f.writeAsBytes(const <int>[]); // empty file
     return RecordingResult(file: f, durationMs: 1500);
   }
+
+  @override
+  Future<bool> hasMicPermission() async => true; // Mock always has permission
+
+  @override
+  Future<bool> hasAnyInputDevice() async => true; // Mock always has devices
+
+  @override
+  Future<bool> canRecordNow() async => true; // Mock can always record
 }

@@ -1,6 +1,6 @@
-import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/app/routes/app_routes.dart';
 import 'package:get/get.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class PreviewHealthCheckController extends GetxController {
   var flutterVersion = ''.obs;
@@ -46,11 +46,11 @@ class PreviewHealthCheckController extends GetxController {
 
   void navigateToMain() {
     // Navigate to the normal app flow
-    Get.offAllNamed(Routes.getInitialRoute());
+    Get.offAllNamed(Routes.root);
   }
 
   void navigateToLogin() {
     // Alternative navigation directly to login
-    Get.offAllNamed(Routes.loginScreen);
+    Get.offAllNamed(Routes.login);
   }
 }

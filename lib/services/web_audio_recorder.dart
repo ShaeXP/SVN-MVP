@@ -4,7 +4,7 @@ import 'dart:html' as html;
 import 'dart:js' as js;
 import 'dart:js_util' as js_util;
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class WebAudioRecorder {
   static WebAudioRecorder? _instance;

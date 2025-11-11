@@ -1,0 +1,36 @@
+# Make sure this file is: supabase/config.toml
+
+[functions.send-email-test]
+enabled = false         # it was for smoke tests; turn it off in prod
+verify_jwt = true       # (harmless if disabled)
+
+[functions.summarize-lite]
+enabled = true
+verify_jwt = true
+import_map = "./functions/summarize-lite/deno.json"
+entrypoint = "./functions/summarize-lite/index.ts"
+
+[functions.sv_run_pipeline]
+enabled = true
+verify_jwt = true
+import_map = "./functions/sv_run_pipeline/deno.json"
+entrypoint = "./functions/sv_run_pipeline/index.ts"
+
+# MISSING IN YOUR FILE → add these two:
+[functions.sv_list_runs]
+verify_jwt = true
+
+[functions.sv_get_run]
+verify_jwt = true
+
+[functions.sv_delete_run]
+verify_jwt = true
+
+[functions.sv_metrics]
+verify_jwt = true
+
+[functions.sv_summarize_openai]
+enabled = true
+verify_jwt = true
+import_map = "./functions/sv_summarize_openai/deno.json"
+entrypoint = "./functions/sv_summarize_openai/index.ts"

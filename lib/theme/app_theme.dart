@@ -34,6 +34,7 @@ class AppTheme {
   final Color gray_200 = const Color(0xFFEEEEEE);
   final Color gray_300 = const Color(0xFFE0E0E0);
   final Color gray_500 = const Color(0xFF9E9E9E);
+  final Color gray_600 = const Color(0xFF757575);
   final Color gray_700 = const Color(0xFF616161);
   final Color gray_900 = const Color(0xFF212121);
 
@@ -45,9 +46,24 @@ class AppTheme {
   final Color grey200 = const Color(0xFFEEEEEE);
 
   // Semantic accents referenced in errors (mapped into your brand)
+  final Color red_50 = const Color(0xFFFFEBEE);
+  final Color red_100 = const Color(0xFFFFCDD2);
+  final Color red_200 = const Color(0xFFEF9A9A);
+  final Color red_300 = const Color(0xFFE57373);
   final Color red_400 = const Color(0xFFEF5350);
+  final Color red_500 = const Color(0xFFF44336);
+  final Color red_600 = const Color(0xFFE53935);
   final Color red_700 = const Color(0xFFD32F2F);
   final Color redCustom = const Color(0xFFE53935);
+  
+  // Blue variants
+  final Color blue_50 = const Color(0xFFE3F2FD);
+  final Color blue_200 = const Color(0xFF90CAF9);
+  final Color blue_400 = const Color(0xFF42A5F5);
+  final Color blue_600 = const Color(0xFF1E88E5);
+  
+  // Deep purple variants
+  final Color deep_purple_50 = const Color(0xFFF3E5F5);
   final Color orange_900 = const Color(0xFFE65100);
   final Color green_600 = const Color(0xFF43A047);
   final Color cyan_900 = const Color(0xFF006064);
@@ -75,7 +91,6 @@ class AppTheme {
   final Color color7FDEE1 = const Color(0xFF7FDEE1); // cyan accent
   final Color cyan_50 = const Color(0xFFE0F7FA);
   final Color cyan_50_01 = const Color(0xFFE0F7FA);
-  final Color blue_200 = const Color(0xFF90CAF9);
   final Color blue_A700 = const Color(0xFF1976D2);
   final Color orange_50 = const Color(0xFFFFF3E0);
   final Color orange_200 = const Color(0xFFFFCC80);

@@ -12,7 +12,7 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: Container(
           width: double.maxFinite,
           padding: EdgeInsets.symmetric(
@@ -27,13 +27,13 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
               Container(
                 padding: EdgeInsets.all(24.0),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(16.h),
                 ),
                 child: Text(
                   'Preview OK',
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    color: theme.colorScheme.onPrimary,
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 32.fSize,
                   ),
@@ -47,10 +47,10 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
                 width: double.maxFinite,
                 padding: EdgeInsets.all(20.0),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12.h),
                   border: Border.all(
-                    color: theme.colorScheme.outline,
+                    color: Theme.of(context).colorScheme.outline,
                     width: 1,
                   ),
                 ),
@@ -59,7 +59,7 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
                   children: [
                     Text(
                       'System Information',
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -67,7 +67,7 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
                     SizedBox(height: 16.0),
 
                     // Flutter version
-                    Obx(() => _buildInfoRow(
+                    Obx(() => _buildInfoRow(context,
                           'Flutter Version:',
                           controller.flutterVersion.value,
                         )),
@@ -75,7 +75,7 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
                     SizedBox(height: 8.0),
 
                     // Dart version
-                    Obx(() => _buildInfoRow(
+                    Obx(() => _buildInfoRow(context,
                           'Dart Version:',
                           controller.dartVersion.value,
                         )),
@@ -110,16 +110,16 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
                 child: ElevatedButton(
                   onPressed: controller.navigateToMain,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8.h),
                     ),
                   ),
                   child: Text(
                     'Continue to App',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -131,8 +131,8 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
               // Additional info
               Text(
                 'Development Health Check',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -143,7 +143,7 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -151,7 +151,7 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
           width: 120.h,
           child: Text(
             label,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
               fontFamily: 'Courier',
             ),
@@ -160,8 +160,8 @@ class PreviewHealthCheckScreen extends GetWidget<PreviewHealthCheckController> {
         Expanded(
           child: Text(
             value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.primary,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w600,
               fontFamily: 'Courier',
             ),
