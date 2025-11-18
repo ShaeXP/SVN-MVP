@@ -84,31 +84,18 @@ class _AnimationSettingsCardState extends State<AnimationSettingsCard> {
                 fontWeight: FontWeight.w600,
               ),
         ),
-        AppSpacing.v(context, 0.5),
+        AppSpacing.v(context, 0.25),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Rive animations'),
-          subtitle: Text(_riveEnabled ? 'Enabled' : 'Disabled'),
           value: _riveEnabled,
           onChanged: _setRive,
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Lottie animations'),
-          subtitle: Text(_lottieEnabled ? 'Enabled' : 'Disabled'),
           value: _lottieEnabled,
           onChanged: _setLottie,
-        ),
-        AppSpacing.v(context, 0.5),
-        Text(
-          'Note: Only one animation type can be enabled at a time.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.6),
-              ),
         ),
       ],
     );

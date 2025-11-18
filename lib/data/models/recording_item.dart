@@ -223,6 +223,7 @@ class SummaryItem {
   final List<String> actionItems;
   final List<String> tags;
   final double? confidence;
+  final String summaryStyle; // 'quick_recap' | 'organized_by_topic' | 'decisions_next_steps'
 
   const SummaryItem({
     required this.id,
@@ -233,6 +234,7 @@ class SummaryItem {
     required this.actionItems,
     required this.tags,
     this.confidence,
+    this.summaryStyle = 'quick_recap',
   });
 
   factory SummaryItem.fromMap(Map<String, dynamic> map) {
@@ -249,6 +251,7 @@ class SummaryItem {
       actionItems: _ls(map['action_items'] ?? map['actionItems']),
       tags: _ls(map['tags']),
       confidence: _d(map['confidence']),
+      summaryStyle: (map['summary_style'] ?? map['summaryStyle'] ?? 'quick_recap').toString(),
     );
   }
 
@@ -261,5 +264,6 @@ class SummaryItem {
         'action_items': actionItems,
         'tags': tags,
         if (confidence != null) 'confidence': confidence,
+        'summary_style': summaryStyle,
       };
 }

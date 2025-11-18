@@ -8,6 +8,8 @@ import 'recording_state.dart';
 import '../../app/routes/app_routes.dart';
 import '../../app/navigation/bottom_nav_controller.dart';
 import '../../widgets/pipeline_progress_cta.dart';
+import '../../domain/summaries/summary_style.dart';
+import '../settings_screen/controller/settings_controller.dart';
 
 class ActiveRecordingScreen extends StatefulWidget {
   const ActiveRecordingScreen({super.key});
@@ -134,6 +136,8 @@ class _ActiveRecordingScreenState extends State<ActiveRecordingScreen> {
                 Obx(() => Text(c.clock, style: Theme.of(context).textTheme.headlineMedium)),
                 const SizedBox(height: 12),
 
+
+
                 // Simple live waveform bar driven by amplitude
                 Obx(() {
                   final h = 12 + (c.amplitude.value * 48); // 12..60
@@ -205,6 +209,7 @@ class _ActiveRecordingScreenState extends State<ActiveRecordingScreen> {
           const SizedBox(height: 16),
           // Progress-aware upload CTA
           PipelineProgressCTA(
+            autoNavigate: false,
             idleLabel: 'Upload file',
             idleIcon: Icons.upload_file,
             autoNavigate: true,

@@ -2,6 +2,7 @@ abstract class Routes {
   Routes._();
 
   // Top-level
+  static const splash = '/splash';
   static const root = '/';
   static const authScreen = '/auth';
   static const login = '/login';
@@ -24,4 +25,5 @@ abstract class Routes {
   static const activeRecording = '/active-recording';
   static const recordingPaused = '/recording-paused';
   static const uploadRecording = '/upload-recording';
+  static const howItWorks = '/how-it-works';
 }

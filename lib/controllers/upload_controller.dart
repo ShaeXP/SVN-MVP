@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:lashae_s_application/services/recording_backend_service.dart';
-import 'package:lashae_s_application/services/pipeline_service.dart';
 import 'package:lashae_s_application/bootstrap_supabase.dart';
+import 'package:lashae_s_application/services/connectivity_service.dart';
+import 'package:lashae_s_application/services/permission_service.dart';
 import 'pipeline_progress_controller.dart';
 
 class UploadController extends GetxController {
@@ -13,16 +13,54 @@ class UploadController extends GetxController {
 
   /// Pick a file and upload it through the pipeline
   Future<void> pickFileAndUpload() async {
+    // Check offline state
+    final connectivity = ConnectivityService.instance;
+    if (connectivity.isOffline.value) {
+      Get.snackbar(
+        'Offline',
+        'You\'re offline. We\'ll try again when you\'re back online.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
     try {
       // Clear any previous error
       errorMessage.value = '';
       isUploading.value = true;
 
+      // Check file access permission (if needed for platform)
+      final permissionService = PermissionService.instance;
+      final hasFilePermission = await permissionService.ensureFileAccessPermission();
+      if (!hasFilePermission) {
+        isUploading.value = false;
+        Get.snackbar(
+          'Permission Required',
+          'We need access to your files to upload a recording.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+
       // 1. File picker
-      final pickerResult = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
-        allowMultiple: false,
-      );
+      FilePickerResult? pickerResult;
+      try {
+        pickerResult = await FilePicker.platform.pickFiles(
+          type: FileType.audio,
+          allowMultiple: false,
+        );
+      } catch (e) {
+        isUploading.value = false;
+        Get.snackbar(
+          'File Selection Error',
+          'That file couldn\'t be opened. Try a different one or check your connection.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 4),
+        );
+        return;
+      }
 
       if (pickerResult == null || pickerResult.files.isEmpty) {
         isUploading.value = false;
@@ -31,7 +69,14 @@ class UploadController extends GetxController {
 
       final file = File(pickerResult.files.first.path!);
       if (!await file.exists()) {
-        throw Exception('Selected file does not exist');
+        isUploading.value = false;
+        Get.snackbar(
+          'File Error',
+          'That file couldn\'t be opened. Try a different one or check your connection.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 4),
+        );
+        return;
       }
 
       // 2. Get user ID

@@ -66,11 +66,12 @@ class SupaUpload {
 
     try {
       // 2) Insert DB row using safe insert helper
+      // Note: Status starts as 'uploading' - edge function will transition to 'transcribing' when pipeline starts
       final payload = <String, dynamic>{
         'user_id': userId,
         'storage_path': storagePath,
         'trace_id': runId,
-        'status': 'uploaded',
+        'status': 'uploading',
         'original_filename': fileName,
         'mime_type': mime,
         'duration_sec': (duration.inMilliseconds / 1000).round(),

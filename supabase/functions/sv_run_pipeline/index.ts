@@ -1,4 +1,23 @@
 // supabase/functions/sv_run_pipeline/index.ts
+// 
+// PIPELINE OVERVIEW
+// =================
+// This edge function orchestrates the complete audio processing pipeline:
+// 1. UI Entrypoints: 
+//    - Upload Audio File (via AuthoritativeUploadService)
+//    - Record Live (via RecordingScreen._stop())
+// 2. Storage: Files uploaded to Supabase Storage bucket 'recordings' with path pattern:
+//    recordings/<userId>/YYYY/MM/DD/timestamp-traceId-filename.ext
+// 3. Deepgram: Transcribes audio using Pre-Recorded API with smart formatting
+// 4. OpenAI: Summarizes transcript using GPT-4o-mini with structured JSON output
+// 5. Resend: Sends summary email to user (if notifyEmail provided)
+// 6. Status Flow: local -> uploading -> transcribing -> summarizing -> ready (or error)
+//
+// ERROR HANDLING:
+// - Deepgram errors: Surface as 'error' status with last_error message
+// - Pipeline failures: Logged with trace ID for debugging
+// - Email failures: Non-blocking, logged but don't fail pipeline
+//
 // Pipeline: Storage -> Deepgram transcript -> OpenAI summary -> DB updates
 // Enhanced for universal ingestion with fallback transcoding
 
@@ -39,6 +58,10 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Define traceContext as a const object to ensure it's always accessible
+  // This avoids ReferenceError issues - the object is always in scope, we just update its value property
+  const traceContext = { value: trace };
+  
   try {
     // Log incoming method and headers (omit auth token)
     const headers = Object.fromEntries(req.headers);
@@ -69,14 +92,26 @@ Deno.serve(async (req) => {
     let storagePath = body.storage_path ?? body.storagePath ?? null;
     const runId = body.run_id ?? body.runId ?? null;
     const traceId = body.trace_id ?? body.traceId ?? trace;
-    const notifyEmail = body.notify_email ?? body.notifyEmail ?? null;
+    // Accept summary_style_key, summary_style, or summaryStyle (for backward compatibility)
+    const summaryStyleKey = (body.summary_style_key ?? body.summary_style ?? body.summaryStyle ?? 'quick_recap_action_items') as string;
+    console.log('[sv_run_pipeline] summary_style_key from client:', summaryStyleKey);
+    // Update traceContext.value with the actual traceId from body or fallback to trace
+    // This ensures it's always in scope for error handling and logging
+    traceContext.value = traceId || trace;
+    // Use provided notifyEmail, or fallback to authenticated user's email
+    let notifyEmail = body.notify_email ?? body.notifyEmail ?? null;
+    if (!notifyEmail && user?.email) {
+      notifyEmail = user.email;
+      console.log('[sv_run_pipeline] Using authenticated user email for notifications', { email: notifyEmail, trace: traceContext.value });
+    }
 
     console.log('[sv_run_pipeline] body', {
       keys: Object.keys(body || {}),
       has_storage_path: !!storagePath,
       recording_id: recordingId,
       run_id: runId,
-      trace
+      trace,
+      summary_style: summaryStyleKey
     });
 
     // If we have recordingId but not storagePath, fetch it from DB (self-heal)
@@ -90,10 +125,10 @@ Deno.serve(async (req) => {
         if (recErr) throw recErr;
         if (rec?.storage_path) {
           storagePath = rec.storage_path as string;
-          console.log('[sv_run_pipeline] filled storage_path from DB', { trace });
+          console.log('[sv_run_pipeline] filled storage_path from DB', { trace: traceContext.value });
         }
       } catch (e) {
-        console.log('[sv_run_pipeline] storage_path lookup failed', { error: (e as Error)?.message, trace });
+        console.log('[sv_run_pipeline] storage_path lookup failed', { error: (e as Error)?.message, trace: traceContext.value });
       }
     }
 
@@ -104,13 +139,13 @@ Deno.serve(async (req) => {
       console.log('[sv_run_pipeline] validation_failed', {
         hasStoragePath: !!storagePath,
         hasRecordingId: !!recordingId,
-        trace
+        trace: traceContext.value
       });
       return new Response(JSON.stringify({
         ok: false,
         code: 'missing_params',
         message: 'Missing storage_path or recording_id',
-        trace
+        trace: traceContext.value
       }), {
         status: 400,
         headers: { ...cors, 'content-type': 'application/json' }
@@ -121,12 +156,12 @@ Deno.serve(async (req) => {
     const [bucket, ...rest] = storagePath.split('/');
     const objectName = rest.join('/');
     if (bucket !== 'recordings' || !objectName) {
-      console.log('[sv_run_pipeline] invalid_storage_path', { bucket, objectName, trace });
+      console.log('[sv_run_pipeline] invalid_storage_path', { bucket, objectName, trace: traceContext.value });
       return new Response(JSON.stringify({
         ok: false,
         code: 'invalid_path',
         message: "storage_path must start with 'recordings/'",
-        trace
+        trace: traceContext.value
       }), {
         status: 400,
         headers: { ...cors, 'content-type': 'application/json' }
@@ -137,13 +172,13 @@ Deno.serve(async (req) => {
       recording_id: recordingId,
       storage_path: storagePath,
       run_id: runId,
-      trace
+      trace: traceContext.value
     });
 
     const pipelineRunId = crypto.randomUUID();
 
     // Verify recording exists before starting pipeline
-    console.log('[sv_run_pipeline] step:verify_recording start', { recording_id: recordingId, trace });
+    console.log('[sv_run_pipeline] step:verify_recording start', { recording_id: recordingId, trace: traceContext.value });
     const { data: recording, error: recordingError } = await adminClient
       .from("recordings")
       .select("id, status, storage_path, user_id")
@@ -154,13 +189,13 @@ Deno.serve(async (req) => {
       console.error('[sv_run_pipeline] step:verify_recording error', { 
         error: recordingError.message, 
         recording_id: recordingId, 
-        trace 
+        trace: traceContext.value 
       });
       return new Response(JSON.stringify({
         ok: false,
         code: 'recording_lookup_failed',
         message: `Failed to lookup recording: ${recordingError.message}`,
-        trace
+        trace: traceContext.value
       }), {
         status: 500,
         headers: { ...cors, 'content-type': 'application/json' }
@@ -170,13 +205,13 @@ Deno.serve(async (req) => {
     if (!recording) {
       console.error('[sv_run_pipeline] step:verify_recording not_found', { 
         recording_id: recordingId, 
-        trace 
+        trace: traceContext.value 
       });
       return new Response(JSON.stringify({
         ok: false,
         code: 'recording_not_found',
         message: `Recording not found with id: ${recordingId}`,
-        trace
+        trace: traceContext.value
       }), {
         status: 404,
         headers: { ...cors, 'content-type': 'application/json' }
@@ -187,7 +222,7 @@ Deno.serve(async (req) => {
       recording_id: recordingId, 
       current_status: recording.status, 
       storage_path: recording.storage_path,
-      trace 
+      trace: traceContext.value 
     });
 
     const { error: runError } = await adminClient.from('pipeline_runs').insert({
@@ -197,15 +232,15 @@ Deno.serve(async (req) => {
       stage: 'queued',
       progress: 0,
       step: 0,
-      trace_id: trace,
+      trace_id: traceContext.value,
     });
     
     if (runError) {
-      console.error('[sv_run_pipeline] pipeline_run creation failed', { error: runError, trace });
+      console.error('[sv_run_pipeline] pipeline_run creation failed', { error: runError, trace: traceContext.value });
       throw new Error(`Pipeline run creation failed: ${runError.message}`);
     }
     
-    console.log('[sv_run_pipeline] pipeline_run created', { run_id: pipelineRunId, trace });
+    console.log('[sv_run_pipeline] pipeline_run created', { run_id: pipelineRunId, trace: traceContext.value });
 
     // 0) Mark uploading (pipeline started)
     console.log('[sv_run_pipeline] step:status_uploading start', { 
@@ -253,13 +288,13 @@ Deno.serve(async (req) => {
     // 4) Summarize with OpenAI (structured JSON)
     console.log('[sv_run_pipeline] step:openai_summarize start', { trace });
     const startOpenAI = Date.now();
-    const summary = await openaiSummarize(transcriptResult.transcript, trace);
+    const summary = await openaiSummarize(transcriptResult.transcript, summaryStyleKey, trace);
     console.log('[sv_run_pipeline] step:openai_summarize ok', { ms: Date.now() - startOpenAI, trace });
 
     // 4) Write summary & flip to ready
     console.log('[sv_run_pipeline] step:save_summary start', { trace });
     const startSaveSummary = Date.now();
-    await upsertSummary(adminClient, recordingId, summary, trace);
+    await upsertSummary(adminClient, recordingId, summary, summaryStyleKey, trace);
     console.log('[sv_run_pipeline] step:save_summary ok', { ms: Date.now() - startSaveSummary, trace });
 
     // Mark as ready (completed) - keep status simple, valid enum values only
@@ -277,20 +312,20 @@ Deno.serve(async (req) => {
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(notifyEmail)) {
-          console.log('[sv_run_pipeline] invalid_email', { notifyEmail, trace });
+          console.log('[sv_run_pipeline] invalid_email', { notifyEmail, trace: traceContext.value });
           return new Response(JSON.stringify({
             ok: false,
             code: 'invalid_email',
             message: 'Invalid email format',
-            trace
+            trace: traceContext.value
           }), {
             status: 400,
             headers: { ...cors, 'content-type': 'application/json' }
           });
         }
 
-        // Generate traceId if not already present
-        const finalTraceId = traceId || crypto.randomUUID();
+        // traceContext.value is always accessible - use it
+        const emailTraceId = traceContext.value || traceId || trace;
         
         // Build email content from summary
         const subject = `Your SmartVoiceNotes summary — ${summary.title}`;
@@ -340,7 +375,7 @@ Deno.serve(async (req) => {
 
   <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
   <p style="font-size: 12px; color: #64748b; margin: 0;">
-    Generated by SmartVoiceNotes • Trace ID: ${finalTraceId}
+    Generated by SmartVoiceNotes • Trace ID: ${emailTraceId}
   </p>
 </body>
 </html>`;
@@ -358,7 +393,7 @@ ${summary.action_items.length > 0 ? `Action Items:\n${summary.action_items.map((
 ${summary.tags.length > 0 ? `Tags: ${summary.tags.join(', ')}\n` : ''}
 
 ---
-Generated by SmartVoiceNotes • Trace ID: ${finalTraceId}
+Generated by SmartVoiceNotes • Trace ID: ${emailTraceId}
 `;
 
         const emailResult = await sendSummaryEmail({
@@ -366,35 +401,33 @@ Generated by SmartVoiceNotes • Trace ID: ${finalTraceId}
           subject,
           html,
           text,
-          traceId: finalTraceId,
+          traceId: emailTraceId,
           replyTo: "support@updates.smartvoicenotes.com"
         });
 
         messageId = emailResult.id;
-        console.log('[EMAIL] delivered', { traceId: finalTraceId, messageId, to: notifyEmail });
+        console.log('[EMAIL] delivered', { traceId: emailTraceId, messageId, to: notifyEmail });
       } catch (emailError) {
-        console.log('[EMAIL] failed', { 
-          traceId: finalTraceId, 
+        // Email failures are non-blocking - log but don't fail the pipeline
+        // The recording is already processed and saved successfully
+        // traceContext.value is always accessible
+        const emailErrorTraceId = traceContext.value || traceId || trace;
+        console.error('[EMAIL] failed (non-blocking)', { 
+          traceId: emailErrorTraceId, 
           to: notifyEmail, 
           err: emailError instanceof Error ? emailError.message : String(emailError) 
         });
-        
-        // Return 502 for email failure but don't roll back DB writes
-        return new Response(JSON.stringify({
-          ok: false,
-          code: 'email_send_failed',
-          message: 'Email delivery failed',
-          trace: finalTraceId
-        }), {
-          status: 502,
-          headers: { ...cors, 'content-type': 'application/json' }
-        });
+        // Continue pipeline - email failure doesn't affect transcription/summarization success
       }
     }
 
+    // Ensure we have a valid trace ID for the response
+    // Use safe access pattern to avoid ReferenceError
+    // traceContext.value is always accessible
+    const responseTraceId = traceContext.value || traceId || trace;
     return new Response(JSON.stringify({ 
       ok: true, 
-      trace: traceId, 
+      trace: responseTraceId, 
       recording_id: recordingId,
       runId: pipelineRunId, // Add the pipeline run ID for UI streaming
       ...(messageId && { messageId })
@@ -403,12 +436,21 @@ Generated by SmartVoiceNotes • Trace ID: ${finalTraceId}
     });
 
   } catch (e) {
-    console.error('[sv_run_pipeline] error', { msg: (e as Error).message, trace });
+    // Safely get trace ID - use helper function to avoid ReferenceError
+    // Access variables in order of scope to avoid ReferenceError
+    // traceContext.value is always accessible (const object defined before try block)
+    const errorTraceId = traceContext.value || trace;
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error('[sv_run_pipeline] error', { 
+      msg: errorMessage, 
+      trace: errorTraceId,
+      stack: e instanceof Error ? e.stack : undefined
+    });
     return new Response(JSON.stringify({ 
       ok: false, 
       code: 'unhandled', 
-      message: String(e), 
-      trace 
+      message: errorMessage, 
+      trace: errorTraceId
     }), { 
       status: 500, 
       headers: { ...cors, 'content-type': 'application/json' } 
@@ -608,7 +650,20 @@ async function deepgramTranscribe(fileUrl: string, trace: string): Promise<strin
   }
 }
 
-async function openaiSummarize(transcript: string, trace: string) {
+function styleInstruction(key: string): string {
+  switch (key) {
+    case 'organized_by_topic':
+      return 'Organize bullets by topic sections (Agenda & Context, Main Discussion, Decisions, Risks/Concerns). Keep the same JSON keys.';
+    case 'decisions_next_steps':
+      return 'Emphasize a one-sentence TL;DR, list Decisions made, Next steps (action_items), and Open questions within bullets. Keep the same JSON keys.';
+    case 'quick_recap_action_items':
+    case 'quick_recap': // Legacy key support
+    default:
+      return 'Keep it concise: short summary, 4–8 key bullets, and clear action_items.';
+  }
+}
+
+async function openaiSummarize(transcript: string, summaryStyleKey: string, trace: string) {
   try {
     const system = `You are an expert meeting/voice-note summarizer.
 Return ONLY JSON with keys: title (string), summary (string),
@@ -616,7 +671,8 @@ bullets (array of concise points), action_items (array of tasks),
 tags (array of short topic tags), confidence (0..1).`;
 
     const user = `Transcript:\n"""${transcript}"""\n
-Summarize for a busy founder. Avoid fluff.`;
+Summarize for a busy founder. Avoid fluff.
+STYLE: ${styleInstruction(summaryStyleKey)}\n`;
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -666,8 +722,10 @@ async function upsertSummary(client: any, recordingId: string, s: {
   action_items: unknown[];
   tags: unknown[];
   confidence: number;
-}, trace: string) {
+}, summaryStyleKey: string, trace: string) {
   try {
+    console.log('[sv_run_pipeline] upsertSummary storing summary_style_key', summaryStyleKey);
+    console.log('[PIPELINE] stored summary with style_key=', summaryStyleKey, 'for recording', recordingId);
     const { error } = await client.from("summaries").insert({
       recording_id: recordingId,
       title: s.title,
@@ -676,6 +734,8 @@ async function upsertSummary(client: any, recordingId: string, s: {
       action_items: s.action_items,
       tags: s.tags,
       confidence: s.confidence,
+      summary_style: summaryStyleKey,
+      summary_style_key: summaryStyleKey, // Store in both fields for compatibility
     });
     if (error) throw new Error(`DB insert summary failed: ${error.message}`);
   } catch (e) {

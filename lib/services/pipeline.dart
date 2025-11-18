@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../env.dart';
 import 'auth.dart';
 import 'status_transition_service.dart';
@@ -176,7 +177,20 @@ class Pipeline {
       
       if (Env.SUMMARY_ENGINE == 'openai') {
         final supabase = Supabase.instance.client;
-        final resp = await supabase.functions.invoke('sv_summarize_openai', body: { 'recordingId': recordingId });
+        // Read preferred summary style (default quick_recap)
+        String style = 'quick_recap';
+        try {
+          // SharedPreferences is optional in this context; swallow errors
+          // to preserve existing behavior on any platform issues.
+          final prefs = await SharedPreferences.getInstance();
+          style = prefs.getString('summarize_style') ?? 'quick_recap';
+        } catch (_) {}
+        final resp = await supabase.functions.invoke('sv_summarize_openai', body: { 
+          'recordingId': recordingId,
+          // Accept both notations defensively
+          'summary_style': style,
+          'summaryStyle': style,
+        });
         if (resp.data == null || resp.status != 200) {
           throw Exception('sv_summarize_openai failed: ${resp.data}');
         }

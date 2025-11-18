@@ -13,15 +13,24 @@ import 'package:lashae_s_application/presentation/record_screen/record_screen.da
 import 'package:lashae_s_application/presentation/recording_paused_screen/recording_paused_screen.dart';
 import 'package:lashae_s_application/presentation/upload_recording_screen/upload_recording_screen.dart';
 import 'package:lashae_s_application/presentation/upload_recording_screen/upload_redirect_page.dart';
+import 'package:lashae_s_application/presentation/splash/app_splash_handoff_screen.dart';
+import 'package:lashae_s_application/presentation/help/how_it_works_screen.dart';
 import 'app_routes.dart';
 
 class AppPages {
   AppPages._();
 
-  // Use AuthGate to determine initial route based on auth state
-  static const initial = Routes.root;
+  // Splash screen is the initial route, then transitions to AuthGate
+  static const initial = Routes.splash;
 
   static final pages = <GetPage<dynamic>>[
+    // Splash handoff screen (shows first, then navigates to root)
+    GetPage(
+      name: Routes.splash,
+      page: () => const AppSplashHandoffScreen(),
+      participatesInRootNavigator: true,
+    ),
+    
     // AuthGate determines whether to show auth or main app
     GetPage(
       name: Routes.root,
@@ -73,6 +82,13 @@ class AppPages {
         GetPage(name: Routes.uploadRecording, page: () => const UploadRecordingScreen()),
         GetPage(name: '/upload-redirect', page: () => const UploadRedirectPage()),
       ],
+    ),
+
+    // Help screen - root navigator (not nested, not part of main shell)
+    GetPage(
+      name: Routes.howItWorks,
+      page: () => const HowItWorksScreen(),
+      participatesInRootNavigator: true,
     ),
   ];
 }

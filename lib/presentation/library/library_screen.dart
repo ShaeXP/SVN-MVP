@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'library_controller.dart';
-import '../../utils/summary_navigation.dart';
-import '../../theme/app_theme.dart';
 import '../../ui/visuals/brand_background.dart';
-import '../../ui/visuals/glass_card.dart';
 import '../../ui/app_spacing.dart';
 import '../../services/sample_export_service.dart';
 import '../../bootstrap_supabase.dart';
 import '../../controllers/upload_controller.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../env.dart';
 import '../../ui/widgets/svn_scaffold_body.dart';
-
-const double _kLibraryTopSpacing = 15.0;
+import '../../ui/widgets/empty_state.dart';
+import '../../ui/widgets/recording_card.dart';
+import '../../app/navigation/bottom_nav_controller.dart';
+import '../../services/connectivity_service.dart';
+import '../../theme/app_text_styles.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
@@ -31,9 +29,34 @@ class LibraryScreen extends StatelessWidget {
         // AppBar matching Home screen
         AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('Library'),
+          title: Builder(
+            builder: (context) => Text(
+              'Recording Library',
+              style: AppTextStyles.screenTitle(context).copyWith(color: Theme.of(context).colorScheme.onSurface),
+            ),
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
+        ),
+        // Search bar (fixed under AppBar)
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.sm,
+          ),
+          child: TextField(
+            onChanged: ctrl.setSearchQuery,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: 'Search summaries...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              isDense: true,
+            ),
+          ),
         ),
         // Content with gradient background
         Expanded(
@@ -52,69 +75,128 @@ class LibraryScreen extends StatelessWidget {
                   }
 
                   if (ctrl.error.value.isNotEmpty) {
+                    final connectivity = ConnectivityService.instance;
                     return SVNScaffoldBody(
                       banner: null,
                       onRefresh: ctrl.fetch,
                       child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
-                            AppSpacing.v(context, 0.75),
-                            Text(
-                              'Couldn\'t load your recordings.\n${ctrl.error.value}',
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                        child: Padding(
+                          padding: AppSpacing.screenPadding(context),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.7),
+                              ),
+                              AppSpacing.v(context, 1),
+                              Text(
+                                'Couldn\'t load your recordings',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                              AppSpacing.v(context, 0.5),
+                              Obx(() {
+                                // Show connectivity-aware message if offline
+                                if (connectivity.isOffline.value) {
+                                  return Text(
+                                    'You\'re offline. Check your internet connection and try again.',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                        ),
+                                    textAlign: TextAlign.center,
+                                  );
+                                }
+                                // Otherwise show the error message from controller
+                                return Text(
+                                  ctrl.error.value,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                      ),
+                                  textAlign: TextAlign.center,
+                                );
+                              }),
+                              AppSpacing.v(context, 1.5),
+                              FilledButton.icon(
+                                onPressed: () => ctrl.fetch(),
+                                icon: const Icon(Icons.refresh, size: 20),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
                   }
 
                   if (ctrl.items.isEmpty) {
+                    debugPrint('[LibraryEmptyState] no recordings, showing CTA');
+                    return SVNScaffoldBody(
+                      banner: null,
+                      onRefresh: ctrl.fetch,
+                      child: EmptyState(
+                        icon: Icons.mic_none_outlined,
+                        title: 'Your library is empty',
+                        subtitle: 'Record or upload audio and your summaries will appear here.',
+                        actionLabel: 'Start recording',
+                        onAction: () {
+                          BottomNavController.I.goRecord();
+                        },
+                      ),
+                    );
+                  }
+
+                  final items = ctrl.filteredItems;
+
+                  // If we have recordings but none match the search, show a simple empty message
+                  if (ctrl.items.isNotEmpty && items.isEmpty) {
                     return SVNScaffoldBody(
                       banner: null,
                       onRefresh: ctrl.fetch,
                       child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.mic_none_outlined,
-                              size: 64,
-                              color: Colors.grey,
-                            ),
-                            AppSpacing.v(context, 1),
-                            Text(
-                              'No recordings yet',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            AppSpacing.v(context, 0.5),
-                            Text(
-                              'Record something to see it here',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey,
-                                  ),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: AppSpacing.screenPadding(context),
+                          child: Text(
+                            'No summaries match your search.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     );
                   }
 
-                  final items = ctrl.items;
                   return SVNScaffoldBody(
                     banner: null,
                     onRefresh: ctrl.fetch,
                     scrollBuilder: (padding) => ListView.separated(
-                      padding: padding,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.md,
+                      ),
                       physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: items.length,
-                      separatorBuilder: (_, __) => AppSpacing.v(context, 0.5),
-                      itemBuilder: (context, index) => _RecordingTile(item: items[index]),
+                      separatorBuilder: (_, __) => SizedBox(height: AppSpacing.md),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        // Only show delete for ready or error status
+                        final canDelete = item.status == 'ready' || item.status == 'error';
+                        return RecordingCard(
+                          item: item,
+                          showExportButton: true,
+                          onExport: () => _showExportOptions(context, item),
+                          showDeleteButton: canDelete,
+                          onDelete: canDelete
+                              ? () => _confirmDeleteRecording(context, ctrl, item)
+                              : null,
+                        );
+                      },
                     ),
                   );
                 }),
@@ -139,120 +221,61 @@ class LibraryScreen extends StatelessWidget {
       ],
     );
   }
-}
 
-class _RecordingTile extends StatelessWidget {
-  final RecordingItem item;
-  const _RecordingTile({required this.item});
-
-  String _fmtDur(int? s) {
-    if (s == null) return '—';
-    final m = s ~/ 60;
-    final sec = s % 60;
-    return '${m}m ${sec}s';
-  }
-
-  Color _statusColor(String s) {
-    switch (s) {
-      case 'ready': return appTheme.green_600;
-      case 'summarizing': return appTheme.blue_200_01; // brandIndigoBlue
-      case 'transcribing': return appTheme.orange_600;
-      case 'uploading': return appTheme.brandDeepPurple;
-      case 'error': return appTheme.red_400;
-      default: return appTheme.gray_500;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final base = AppSpacing.base(context);
-
-    return GlassCard(
-      margin: EdgeInsets.symmetric(horizontal: base, vertical: base * 0.5),
-      radius: 20,
-      elevated: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            // Use standardized navigation helper with fallback
-            openRecordingSummary(recordingId: item.id);
-          },
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left status bar
-              Container(
-                width: 6,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _statusColor(item.status),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              AppSpacing.h(context, 0.75),
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title (1 line ellipsis)
-                    Text(
-                      item.title?.isNotEmpty == true ? item.title! : 'Untitled recording',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.95),
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    AppSpacing.v(context, 0.25),
-                    // Subtitle (2 lines ellipsis) - show preview if available
-                    Text(
-                      'No preview yet...', // TODO: Add summary preview when available
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.75),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    AppSpacing.v(context, 0.4),
-                    // Subline with duration and status
-                    Text(
-                      Env.demoMode 
-                        ? '${_fmtDur(item.durationSec)} • Demo sample'
-                        : '${_fmtDur(item.durationSec)} • ${item.status}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Export button (share icon)
-              IconButton(
-                icon: Icon(
-                  Icons.share_outlined,
-                  color: colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-                onPressed: () => _showExportOptions(context, item),
-                tooltip: 'Export as public sample',
-              ),
-              // Chevron
-              Icon(
-                Icons.chevron_right,
-                color: colorScheme.onSurfaceVariant,
-                size: 20,
-              ),
-            ],
-          ),
+  /// Show delete confirmation dialog
+  static Future<void> _confirmDeleteRecording(
+    BuildContext context,
+    LibraryController controller,
+    RecordingItem item,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete summary?'),
+        content: const Text(
+          'This will remove this recording and its summary from your library. This cannot be undone.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
+
+    if (result == true && context.mounted) {
+      try {
+        await controller.deleteRecording(item.id);
+        // Success: card already removed optimistically, just show confirmation
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Recording deleted'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        // Error: item was restored by controller, show error message
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete: ${e.toString()}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    }
   }
 
   /// Show export options bottom sheet

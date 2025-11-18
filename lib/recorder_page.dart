@@ -333,7 +333,7 @@ class _RecorderPageState extends State<RecorderPage> {
                   final path = r['storage_path'] as String;
                   final durMs = (r['duration_ms'] as int?) ?? 0;
                   final secs = (durMs / 1000).toStringAsFixed(1);
-                  final status = (r['status'] as String?) ?? 'uploaded';
+                  final status = (r['status'] as String?) ?? 'uploading';
                   return ListTile(
                     dense: true,
                     title: Text(runId,

@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_sound/flutter_sound.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import 'recording_state.dart';
 import 'package:lashae_s_application/services/upload_service.dart';
@@ -15,6 +14,8 @@ import 'package:lashae_s_application/services/file_upload_service.dart';
 import 'package:lashae_s_application/services/pipeline_tracker.dart';
 import 'package:lashae_s_application/presentation/shared/pipeline_hud.dart';
 import 'package:lashae_s_application/data/recording_repo.dart';
+import 'package:lashae_s_application/utils/recording_permission_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RecordingController extends GetxController {
   final state = RecState.idle.obs;
@@ -28,6 +29,9 @@ class RecordingController extends GetxController {
   StreamSubscription<RecordingDisposition>? _ampSub;
   bool _sessionOpen = false;
 
+  // Per-recording summary style (internal key). Defaults to global setting.
+  final RxString summaryStyleForThisRecording = 'quick_recap'.obs;
+
   String? _tempPath;   // finalized after stop()
   final String _ext = 'm4a';
 
@@ -36,6 +40,7 @@ class RecordingController extends GetxController {
     super.onInit();
     debugPrint('[DI] RecordingController onInit');
     _ensureSession();
+    _loadDefaultSummaryStyle();
   }
 
   Future<void> _ensureSession() async {
@@ -61,12 +66,21 @@ class RecordingController extends GetxController {
   Future<void> start() async {
     if (state.value != RecState.idle) return;
 
-    // Permission
-    final status = await Permission.microphone.status;
-    if (status != PermissionStatus.granted) {
-      // You can surface a snackbar/toast here if desired
-      return;
-    }
+    // Use permission helper for user-friendly permission flow
+    final context = Get.context;
+    if (context == null) return;
+
+    await RecordingPermissionHelper.startRecordingWithPermissions(
+      context: context,
+      onPermissionGranted: () async {
+        // Permission granted, proceed with recording
+        await _startRecording();
+      },
+    );
+  }
+
+  Future<void> _startRecording() async {
+    // Permission already checked, proceed with recording
 
     await _ensureSession();
 
@@ -200,7 +214,9 @@ class RecordingController extends GetxController {
     isUploading.value = true;
     try {
       final fileService = FileUploadService.instance;
-      final result = await fileService.pickAndUploadAudioFile();
+      final result = await fileService.pickAndUploadAudioFile(
+        summaryStyleOverride: summaryStyleForThisRecording.value,
+      );
       
       if (result['success'] == true) {
         final recordingId = result['recording_id'] as String?;
@@ -262,6 +278,22 @@ class RecordingController extends GetxController {
     } finally {
       isUploading.value = false;
     }
+  }
+
+  Future<void> _loadDefaultSummaryStyle() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      summaryStyleForThisRecording.value = p.getString('summarize_style') ?? 'quick_recap';
+    } catch (_) {
+      summaryStyleForThisRecording.value = 'quick_recap';
+    }
+  }
+
+  Future<void> promoteStyleToDefault() async {
+    final key = summaryStyleForThisRecording.value;
+    final p = await SharedPreferences.getInstance();
+    await p.setString('summarize_style', key);
+    Get.snackbar('Default updated', 'Updated default summary style.');
   }
 
   @override

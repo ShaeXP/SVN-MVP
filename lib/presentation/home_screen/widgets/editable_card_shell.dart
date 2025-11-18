@@ -26,21 +26,12 @@ class EditableCardShell extends StatelessWidget {
           children: [
             Row(
               children: [
-                dragHandle,
-                const SizedBox(width: 8),
                 if (title != null) ...[
                   Expanded(child: Text(title!, style: const TextStyle(fontWeight: FontWeight.w600))),
                 ] else ...[
                   const Expanded(child: SizedBox.shrink()),
                 ],
-                PopupMenuButton<String>(
-                  onSelected: onMenu,
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'up', child: Text('Move up')),
-                    PopupMenuItem(value: 'down', child: Text('Move down')),
-                    PopupMenuItem(value: 'hide', child: Text('Hide')),
-                  ],
-                ),
+                dragHandle,
               ],
             ),
             const SizedBox(height: 8),

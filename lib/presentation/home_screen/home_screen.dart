@@ -4,11 +4,12 @@ import 'controller/home_controller.dart';
 import 'home_sections.dart';
 import 'widgets/editable_card_shell.dart';
 import 'widgets/read_only_card_shell.dart';
-import '../../ui/widgets/unified_status_chip.dart';
 import '../../ui/widgets/svn_app_bar.dart';
-import '../../services/pipeline_tracker.dart';
 import '../../ui/app_spacing.dart';
 import '../../ui/widgets/svn_scaffold_body.dart';
+import '../../theme/app_gradients.dart';
+import '../../services/onboarding_service.dart';
+import '../../ui/widgets/home_onboarding_strip.dart';
 
 // App bar height constant for consistent spacing calculations
 const double _kAppBarHeight = 56.0;
@@ -19,7 +20,6 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<HomeController>();
-    final tracker = PipelineTracker.I;
     final topInset = MediaQuery.of(context).padding.top + _kAppBarHeight;
 
     return Scaffold(
@@ -36,67 +36,7 @@ class HomeScreen extends StatelessWidget {
             top: false, // Don't add top padding - we calculate it ourselves
             child: Padding(
               padding: EdgeInsets.only(top: topInset),
-              child: Obx(() {
-                final basePadding = AppSpacing.base(context);
-                final recordingId = tracker.recordingId.value;
-                Widget? banner;
-                if (recordingId != null) {
-                  banner = Padding(
-                    padding: EdgeInsets.fromLTRB(basePadding, 0, basePadding, basePadding),
-                    child: SizedBox(
-                      height: 80,
-                      child: UnifiedPipelineBanner(recordingId: recordingId),
-                    ),
-                  );
-                }
-
-                if (controller.isLoading.value) {
-                  return SVNScaffoldBody(
-                    banner: banner,
-                    onRefresh: controller.refresh,
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                }
-
-                if (controller.errorText.value.isNotEmpty) {
-                  return SVNScaffoldBody(
-                    banner: banner,
-                    onRefresh: controller.refresh,
-                    child: _CenterBox(
-                      title: 'Welcome',
-                      child: Column(
-                        children: [
-                          Text(controller.errorText.value, textAlign: TextAlign.center),
-                          const SizedBox(height: 12),
-                          OutlinedButton(onPressed: controller.refresh, child: const Text('Retry')),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                final items = controller.sections
-                    .where((s) => !controller.hidden.contains(s))
-                    .toList();
-
-                if (controller.editing.value) {
-                  return SVNScaffoldBody(
-                    banner: banner,
-                    scrollBuilder: (padding) => _buildEditableSections(
-                      context,
-                      controller,
-                      items,
-                      padding,
-                    ),
-                  );
-                }
-
-                return SVNScaffoldBody(
-                  banner: banner,
-                  onRefresh: controller.refresh,
-                  child: _buildReadOnlySections(context, controller, items),
-                );
-              }),
+              child: _HomeContent(controller: controller),
             ),
           ),
         ],
@@ -110,6 +50,8 @@ Widget _buildReadOnlySections(
   HomeController controller,
   List<HomeSection> items,
 ) {
+  final onboardingService = Get.find<OnboardingService>();
+  
   return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -119,18 +61,26 @@ Widget _buildReadOnlySections(
               ? null
               : (HomeSectionRegistry.titles[section] ?? ''),
           child: HomeSectionRegistry.builders[section]!(context),
-          menuBuilder: PopupMenuButton<String>(
-            onSelected: (action) {
-              if (action == 'hide') controller.hideSection(section);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'hide', child: Text('Hide this')),
-            ],
-          ),
+          menuBuilder: null, // No menu in normal mode - only show in edit mode
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: AppSpacing.md),
+        // Show onboarding strip after welcome section and before quickTabs
+        if (section == HomeSection.welcome)
+          Obx(() {
+            if (onboardingService.isHomeOnboardingDismissed) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              children: [
+                HomeOnboardingStrip(
+                  onDismiss: () => onboardingService.dismissHomeOnboarding(),
+                ),
+                SizedBox(height: AppSpacing.md),
+              ],
+            );
+          }),
       ],
-      const SizedBox(height: 24),
+      SizedBox(height: AppSpacing.xl),
       _TrustStrip(),
     ],
   );
@@ -177,7 +127,7 @@ Widget _buildEditableSections(
           child: HomeSectionRegistry.builders[section]!(context),
           dragHandle: ReorderableDragStartListener(
             index: index,
-            child: const Icon(Icons.drag_indicator, size: 22),
+            child: const Icon(Icons.drag_handle, size: 22),
           ),
         ),
       );
@@ -238,27 +188,10 @@ class _HomeGradientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return DecoratedBox(
       position: DecorationPosition.background,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: const Alignment(-1.0, -0.8),   // top-left-ish
-          end: const Alignment(1.0, 0.9),       // bottom-right-ish
-          colors: isDark
-              ? const [
-                  Color(0xFF1C1730),            // deep violet
-                  Color(0xFF0E2333),            // ink blue
-                ]
-              : const [
-                  Color(0xFF8B5CF6),            // violet-500
-                  Color(0xFF6366F1),            // indigo-500
-                  Color(0xFF3B82F6),            // blue-500
-                  Color(0xFF22D3EE),            // cyan-400
-                ],
-          stops: isDark ? const [0.0, 1.0] : const [0.0, 0.35, 0.7, 1.0],
-        ),
+        gradient: AppGradients.mainBackgroundFor(context),
       ),
       child: Stack(
         children: const [
@@ -280,6 +213,7 @@ class _RadialGlow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: IgnorePointer(
+        ignoring: true, // Explicitly set to true to avoid mutations
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: RadialGradient(
@@ -291,6 +225,157 @@ class _RadialGlow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Stable widget that contains the LayoutBuilder, with reactive content inside
+class _HomeContent extends StatelessWidget {
+  final HomeController controller;
+  
+  const _HomeContent({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    // Keep SVNScaffoldBody stable - it contains LayoutBuilder which must not be rebuilt
+    // Use Obx only for the content that changes, passed as child/scrollBuilder
+    return Obx(() {
+      final isLoading = controller.isLoading.value;
+      final errorText = controller.errorText.value;
+      final isEditing = controller.editing.value;
+      final items = controller.sections
+          .where((s) => !controller.hidden.contains(s))
+          .toList();
+
+      // Build callbacks and content outside LayoutBuilder to avoid mutations during layout
+      ScrollBuilder? scrollBuilderCallback;
+      Widget? contentChild;
+      
+      if (isLoading) {
+        contentChild = const Center(child: CircularProgressIndicator());
+      } else if (errorText.isNotEmpty) {
+        contentChild = _CenterBox(
+          title: 'Welcome',
+          child: Column(
+            children: [
+              Text(errorText, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: controller.refresh, child: const Text('Retry')),
+            ],
+          ),
+        );
+      } else if (isEditing) {
+        // Use scrollBuilder for editable mode - build callback outside LayoutBuilder
+        scrollBuilderCallback = (padding) => _buildEditableSections(
+          context,
+          controller,
+          items,
+          padding,
+        );
+        contentChild = const SizedBox.shrink(); // Placeholder when using scrollBuilder
+      } else {
+        contentChild = _buildReadOnlySections(context, controller, items);
+      }
+
+      return SVNScaffoldBody(
+        key: const ValueKey('home_scaffold_body'), // Stable key to prevent rebuilds
+        onRefresh: controller.refresh,
+        child: contentChild,
+        scrollBuilder: scrollBuilderCallback,
+      );
+    });
+  }
+  
+  Widget _buildReadOnlySections(
+    BuildContext context,
+    HomeController controller,
+    List<HomeSection> items,
+  ) {
+    final onboardingService = Get.find<OnboardingService>();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final section in items) ...[
+          ReadOnlyCardShell(
+            title: section == HomeSection.welcome
+                ? null
+                : (HomeSectionRegistry.titles[section] ?? ''),
+            child: HomeSectionRegistry.builders[section]!(context),
+            menuBuilder: null, // No menu in normal mode - only show in edit mode
+          ),
+          SizedBox(height: AppSpacing.md),
+          // Show onboarding strip after welcome section and before quickTabs
+          if (section == HomeSection.welcome)
+            Obx(() {
+              if (onboardingService.isHomeOnboardingDismissed) {
+                return const SizedBox.shrink();
+              }
+              return Column(
+                children: [
+                  HomeOnboardingStrip(
+                    onDismiss: () => onboardingService.dismissHomeOnboarding(),
+                  ),
+                  SizedBox(height: AppSpacing.md),
+                ],
+              );
+            }),
+        ],
+        SizedBox(height: AppSpacing.xl),
+        _TrustStrip(),
+      ],
+    );
+  }
+  
+  Widget _buildEditableSections(
+    BuildContext context,
+    HomeController controller,
+    List<HomeSection> items,
+    EdgeInsets padding,
+  ) {
+    // DO NOT mutate any state here - this is called inside LayoutBuilder.builder
+    // Only build widgets from the provided parameters
+    return ReorderableListView.builder(
+      padding: padding.copyWith(
+        bottom: padding.bottom + AppSpacing.base(context),
+      ),
+      physics: const AlwaysScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: items.length,
+      onReorder: controller.reorder, // This is safe - it's a callback, not called during build
+      itemBuilder: (context, index) {
+        final section = items[index];
+        return Material(
+          key: ValueKey('home_${section.name}'),
+          color: Colors.transparent,
+          child: EditableCardShell(
+            title: section == HomeSection.welcome
+                ? null
+                : (HomeSectionRegistry.titles[section] ?? ''),
+            onMenu: (action) {
+              // This callback is safe - it's not called during build/layout
+              switch (action) {
+                case 'hide':
+                  controller.hideSection(section);
+                  break;
+                case 'up':
+                  if (index > 0) controller.reorder(index, index - 1);
+                  break;
+                case 'down':
+                  if (index < items.length - 1) {
+                    controller.reorder(index, index + 2);
+                  }
+                  break;
+              }
+            },
+            child: HomeSectionRegistry.builders[section]!(context),
+            dragHandle: ReorderableDragStartListener(
+              index: index,
+              child: const Icon(Icons.drag_handle, size: 22),
+            ),
+          ),
+        );
+      },
     );
   }
 }

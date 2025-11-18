@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/settings_controller.dart';
 import '../../../env.dart';
+import '../../../ui/visuals/glass_card.dart';
+import '../../../ui/app_spacing.dart';
+import 'settings_rows.dart';
 
 class PrivacyCard extends StatelessWidget {
   const PrivacyCard({super.key});
@@ -9,44 +12,44 @@ class PrivacyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Get.find<SettingsController>();
-    return Material(
-      borderRadius: BorderRadius.circular(16),
-      color: Theme.of(context).colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Obx(() => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 4, bottom: 8),
-              child: Text('Privacy', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+    return GlassCard(
+      radius: 16,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Obx(() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Privacy', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          SettingsToggleRow(
+            title: 'Analytics & usage reports',
+            subtitle: 'Optional, anonymized usage stats.',
+            value: c.analyticsOptIn.value,
+            onChanged: c.setAnalytics,
+          ),
+          SettingsToggleRow(
+            title: 'Crash diagnostics',
+            subtitle: 'Help improve reliability (never includes your audio).',
+            value: c.crashOptIn.value,
+            onChanged: c.setCrash,
+          ),
+          if (!Env.demoMode)
+            SettingsToggleRow(
+              title: 'Redact personal info in transcripts',
+              value: c.redactPII.value,
+              onChanged: c.setRedact,
             ),
-            SwitchListTile(
-              title: const Text('Analytics & usage reports'),
-              value: c.analyticsOptIn.value,
-              onChanged: c.setAnalytics,
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(vertical: 6),
+            title: const Text('Data retention'),
+            subtitle: Text(
+              'Keeps summaries for ${_labelForRetention(c.dataRetentionDays.value)}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            SwitchListTile(
-              title: const Text('Crash diagnostics'),
-              value: c.crashOptIn.value,
-              onChanged: c.setCrash,
-            ),
-            // Hide redaction toggle in demo mode
-            if (!Env.demoMode)
-              SwitchListTile(
-                title: const Text('Redact personal info in transcripts'),
-                value: c.redactPII.value,
-                onChanged: c.setRedact,
-              ),
-            ListTile(
-              title: const Text('Data retention'),
-              subtitle: Text(_labelForRetention(c.dataRetentionDays.value)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _chooseRetention(context, c),
-            ),
-          ],
-        )),
-      ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _chooseRetention(context, c),
+          ),
+        ],
+      )),
     );
   }
 

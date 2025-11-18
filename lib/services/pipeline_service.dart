@@ -7,11 +7,12 @@ import 'package:get/get.dart';
 import 'package:lashae_s_application/presentation/settings_screen/controller/settings_controller.dart';
 import '../utils/auth_guard.dart';
 import '../env.dart';
+import '../debug/metrics_tracker.dart';
 
 class PipelineService {
   final supa = Supabase.instance.client;
 
-  Future<Map<String, String>> run(String localPath, {String? storagePath, String? contentType, bool providedTranscript = false, String? transcriptText}) async {
+  Future<Map<String, String>> run(String localPath, {String? storagePath, String? contentType, bool providedTranscript = false, String? transcriptText, String? summaryStyleOverride}) async {
     try {
       final session = AuthGuard.requireSession();
       final user = session.user;
@@ -32,9 +33,26 @@ class PipelineService {
         fullStoragePath = null;
         contentType = contentType ?? 'text/plain';
       } else {
-        // Audio file upload
+        // Audio file upload - direct Flutter → Supabase Storage
         final objectPath = '${user.id}/$y/$m/$d/$recordingId.m4a';
-        final bytes = await File(localPath).readAsBytes();
+        final file = File(localPath);
+        final bytes = await file.readAsBytes();
+        final fileSize = bytes.lengthInBytes;
+        
+        // Get duration if available (from file metadata or passed parameter)
+        int? durationSec;
+        try {
+          // Try to get duration from file if available
+          // Note: This may not always be available, so we make it optional
+        } catch (_) {
+          // Duration not available, that's okay
+        }
+        
+        final uploadStartedAt = DateTime.now();
+        debugPrint('[UPLOAD] starting upload for recording $recordingId, '
+            'size=${fileSize}B (${(fileSize / 1024).toStringAsFixed(1)}KB), '
+            'path=$objectPath${durationSec != null ? ', duration=${durationSec}s' : ''}');
+        
         await supa.storage.from(bucket).uploadBinary(
           objectPath,
           bytes,
@@ -44,7 +62,22 @@ class PipelineService {
             cacheControl: '3600',
           ),
         );
-        debugPrint('[SVN][UPLOAD] ok object=$objectPath bytes=${bytes.length}');
+        
+        final uploadFinishedAt = DateTime.now();
+        final elapsedMs = uploadFinishedAt.difference(uploadStartedAt).inMilliseconds;
+        debugPrint('[UPLOAD] finished upload for $recordingId in ${elapsedMs}ms '
+            '(size=${fileSize}B, path=$objectPath)');
+        
+        // Track upload metrics (debug only)
+        if (kDebugMode) {
+          MetricsTracker.I.trackUpload(
+            recordingId: recordingId,
+            sizeBytes: fileSize,
+            elapsedMs: elapsedMs,
+            startedAt: uploadStartedAt,
+          );
+        }
+        
         fullStoragePath = 'recordings/$objectPath';
         contentType = contentType ?? 'audio/m4a';
       }
@@ -90,12 +123,16 @@ class PipelineService {
 
       // 4) Invoke pipeline function with preferences
       debugPrint('[SVN][PIPELINE] recordingId=$recordingId storagePath=$fullStoragePath fn=sv_run_pipeline demo=${Env.demoMode}');
+      final styleKey = summaryStyleOverride ?? 'quick_recap';
+      debugPrint('[PIPELINE] start for pipeline_service recordingId=$recordingId, style=$styleKey');
       final body = {
         if (fullStoragePath != null) 'storage_path': fullStoragePath,
         'recording_id': recordingId,
         'content_type': contentType,
         'provided_transcript': providedTranscript,
         if (transcriptText != null) 'transcript_text': transcriptText,
+        if (summaryStyleOverride != null && summaryStyleOverride.isNotEmpty) 'summary_style': summaryStyleOverride,
+        if (summaryStyleOverride != null && summaryStyleOverride.isNotEmpty) 'summary_style_key': summaryStyleOverride,
         if (settings != null) 'prefs': {
           'normalize_audio': settings.normalizeAudio.value,
           'auto_trim_silence': settings.autoTrimSilence.value,

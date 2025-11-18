@@ -47,6 +47,21 @@ To run the app with environment variables defined in an env.json file, follow th
     ```bash
     --dart-define-from-file=env.json
     ```
+
+## Native Splash Setup
+
+The app uses `flutter_native_splash` to generate native splash screens for iOS and Android. The configuration is defined in `pubspec.yaml`.
+
+To regenerate the native splash screens after updating the splash image:
+
+```bash
+flutter clean
+flutter pub get
+dart run flutter_native_splash:create
+```
+
+**Note:** Ensure the splash image exists at `assets/splash/smartvoicenotes_splash.png` before running the generation command.
+
 ## 📁 Project Structure
 ```
 flutter_app/

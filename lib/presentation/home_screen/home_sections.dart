@@ -18,8 +18,8 @@ typedef SectionBuilder = Widget Function(BuildContext ctx);
 class HomeSectionRegistry {
   static final Map<HomeSection, String> titles = {
     HomeSection.welcome: 'Welcome',
-    HomeSection.quickTabs: 'Quick',
-    HomeSection.processingSummary: 'Background processing',
+    HomeSection.quickTabs: '',
+    HomeSection.processingSummary: 'Finishing your summaries',
     HomeSection.recentSummaries: 'Recent summaries',
     HomeSection.actionItems: 'Action items',
   };

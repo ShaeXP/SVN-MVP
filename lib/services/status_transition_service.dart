@@ -56,7 +56,7 @@ class StatusTransitionService {
   }) async {
     try {
       final userId = await AuthX.requireUserId();
-      final status = success ? 'uploaded' : 'error';
+      final status = success ? 'ready' : 'error';
       
       await _updateRecordingStatus(recordingId, userId, status);
       

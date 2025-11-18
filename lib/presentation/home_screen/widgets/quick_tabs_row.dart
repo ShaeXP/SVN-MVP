@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/navigation/bottom_nav_controller.dart';
+import '../../../utils/recording_permission_helper.dart';
 
 class QuickTabsRow extends StatelessWidget {
   const QuickTabsRow({super.key});
@@ -11,7 +12,16 @@ class QuickTabsRow extends StatelessWidget {
       children: [
         Expanded(
           child: FilledButton(
-            onPressed: () => nav.goRecord(),
+            onPressed: () {
+              // Use permission helper to gate recording
+              RecordingPermissionHelper.startRecordingWithPermissions(
+                context: context,
+                onPermissionGranted: () {
+                  // Navigate to Record tab once permission is granted
+                  nav.goRecord();
+                },
+              );
+            },
             child: const Text('Record'),
           ),
         ),

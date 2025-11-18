@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'package:lashae_s_application/env.dart';
-import 'package:lashae_s_application/presentation/auth/auth_gate.dart';
 import 'package:lashae_s_application/services/supabase_service.dart';
 import 'package:lashae_s_application/services/pipeline_tracker.dart';
 import 'package:lashae_s_application/bootstrap_supabase.dart';
@@ -11,15 +10,20 @@ import 'package:lashae_s_application/ui/theme/svn_theme.dart';
 import 'package:lashae_s_application/app/navigation/bottom_nav_controller.dart';
 import 'package:lashae_s_application/app/bindings/app_binding.dart';
 import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/services/connectivity_service.dart';
+import 'package:lashae_s_application/services/permission_service.dart';
+import 'package:lashae_s_application/services/onboarding_service.dart';
 import 'package:sizer/sizer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Debug error handling
+  // Enhanced error handling with full stack trace logging
   FlutterError.onError = (details) {
-    FlutterError.presentError(details);
+    FlutterError.dumpErrorToConsole(details); // Ensures full console output
     debugPrint('[FlutterError] ${details.exceptionAsString()}');
+    debugPrint('[FlutterError] Stack: ${details.stack}');
+    FlutterError.presentError(details);
   };
 
   try {
@@ -33,16 +37,48 @@ Future<void> main() async {
     // Install pipeline tracker service
     await Get.putAsync<PipelineTracker>(() async => PipelineTracker().init(), permanent: true);
     
-    // Set up global error widget to prevent white screen crashes
-    ErrorWidget.builder = (details) => Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('A UI error occurred:\n${details.exceptionAsString()}'),
-        ),
-      ),
-    );
+    // Initialize connectivity service
+    ConnectivityService.instance;
     
+    // Initialize permission service
+    Get.put(PermissionService(), permanent: true);
+    
+    // Initialize onboarding service
+    await Get.putAsync<OnboardingService>(() async => OnboardingService().init(), permanent: true);
+    
+    // Set up global error widget to prevent white screen crashes
+    ErrorWidget.builder = (details) {
+      // Log full error details BEFORE showing UI
+      FlutterError.dumpErrorToConsole(details);
+      debugPrint('[WIDGET_ERROR] ${details.exceptionAsString()}');
+      debugPrint('[WIDGET_ERROR] Stack: ${details.stack}');
+      
+      return Scaffold(
+        backgroundColor: Colors.orange,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'WIDGET ERROR',
+                  style: TextStyle(fontSize: 24, color: Colors.white),
+                ),
+                SizedBox(height: 20),
+                Text(
+                  details.exceptionAsString(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    };
+    
+    // Call runApp directly in the default zone
     runApp(const MyApp());
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   } catch (e) {
@@ -79,10 +115,12 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'SmartVoiceNotes',
           navigatorKey: Get.key,
+          defaultTransition: Transition.cupertino,
+          transitionDuration: const Duration(milliseconds: 260),
           theme: SVNTheme.theme(context),
           initialBinding: AppBinding(),
           getPages: AppPages.pages,
-          home: const AuthGate(),
+          initialRoute: AppPages.initial,
           unknownRoute: GetPage(
             name: '/404',
             page: () => Scaffold(
@@ -101,29 +139,36 @@ class MyApp extends StatelessWidget {
             }),
           ],
           builder: (context, child) {
-            ErrorWidget.builder = (details) => Scaffold(
-              backgroundColor: Colors.orange,
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'WIDGET ERROR',
-                        style: TextStyle(fontSize: 24, color: Colors.white),
-                      ),
-                      SizedBox(height: 20),
-                      Text(
-                        details.exceptionAsString(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ],
+            ErrorWidget.builder = (details) {
+              // Log full error details BEFORE showing UI
+              FlutterError.dumpErrorToConsole(details);
+              debugPrint('[WIDGET_ERROR] ${details.exceptionAsString()}');
+              debugPrint('[WIDGET_ERROR] Stack: ${details.stack}');
+              
+              return Scaffold(
+                backgroundColor: Colors.orange,
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'WIDGET ERROR',
+                          style: TextStyle(fontSize: 24, color: Colors.white),
+                        ),
+                        SizedBox(height: 20),
+                        Text(
+                          details.exceptionAsString(),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
+              );
+            };
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
               child: child ?? Container(

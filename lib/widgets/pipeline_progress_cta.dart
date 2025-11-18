@@ -26,7 +26,7 @@ class PipelineProgressCTA extends StatefulWidget {
     this.onStartAction,
     this.idleLabel,
     this.idleIcon,
-    this.autoNavigate = true,
+    this.autoNavigate = false,
   });
 
   @override
@@ -117,6 +117,11 @@ class _PipelineProgressCTAState extends State<PipelineProgressCTA>
       // Debug logging
       debugPrint('[PipelineProgressCTA] stage=$stage, recId=$recId');
       
+      // When complete, show a tappable CTA to open the summary directly
+      if (stage == PipeStage.ready && recId != null) {
+        return _buildReadyCTA(context, recId);
+      }
+      
       // Consider active if tracking a recording and not in idle/ready/error final states
       // local stage can be active if we're just starting
       final isActive = recId != null && 
@@ -150,6 +155,16 @@ class _PipelineProgressCTAState extends State<PipelineProgressCTA>
         return _buildIdleState(context);
       }
     });
+  }
+
+  Widget _buildReadyCTA(BuildContext context, String recordingId) {
+    return SummaryReadyCTA(
+      recordingId: recordingId,
+      onOpenSummary: (id) {
+        debugPrint('[SummaryReadyCTA] onOpenSummary called for id=$id');
+        openRecordingSummary(recordingId: id);
+      },
+    );
   }
 
   Widget _buildIdleState(BuildContext context) {
@@ -323,6 +338,73 @@ class _PipelineProgressCTAState extends State<PipelineProgressCTA>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fresh, isolated CTA to ensure it receives touch events in ready state
+class SummaryReadyCTA extends StatelessWidget {
+  final String recordingId;
+  final void Function(String recordingId) onOpenSummary;
+
+  const SummaryReadyCTA({
+    super.key,
+    required this.recordingId,
+    required this.onOpenSummary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          debugPrint('[SummaryReadyCTA] tapped for recordingId=$recordingId');
+          if (recordingId.isEmpty) {
+            debugPrint('[SummaryReadyCTA] recordingId empty; not navigating');
+            return;
+          }
+          onOpenSummary(recordingId);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.15)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, size: 24, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Summary Ready',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Tap to open your summary',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 18, color: Colors.white.withOpacity(0.9)),
+            ],
+          ),
         ),
       ),
     );

@@ -6,8 +6,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/logger.dart';
 import '../../../services/auth.dart';
+import '../../../services/recording_delete_service.dart';
 import '../../../env.dart';
 import '../home_sections.dart';
+import '../../library/library_controller.dart';
 
 class HomeController extends GetxController {
   final _sb = Supabase.instance.client;
@@ -106,6 +108,7 @@ class HomeController extends GetxController {
     try {
       final uid = await AuthX.requireUserId();
       // In-progress recordings
+      // Note: Using hard delete via edge function, so no deleted_at filter needed
       final rec = await _sb
           .from('recordings')
           .select('id,status,created_at')
@@ -117,6 +120,7 @@ class HomeController extends GetxController {
       inProgressCount.value = inProgress.length;
 
       // Recent summaries
+      // Note: Using hard delete via edge function, so deleted recordings are permanently removed
       final sums = await _sb
           .from('summaries')
           .select('id,recording_id,title,summary,tags,action_items,created_at')
@@ -126,6 +130,7 @@ class HomeController extends GetxController {
       recentSummaries.assignAll(sumList);
 
       // Action inbox: merge & dedupe action_items[] from last 10 summaries
+      // Note: Using hard delete via edge function, so deleted recordings are permanently removed
       final sums10 = await _sb
           .from('summaries')
           .select('action_items')
@@ -159,6 +164,44 @@ class HomeController extends GetxController {
       logx('[HOME] fetch fail: ${e.toString()}', tag: 'HOME');
       errorText.value = e.toString();
       isLoading.value = false;
+    }
+  }
+
+  /// Delete a recording (hard delete via edge function)
+  /// Removes it from local lists optimistically, then performs the deletion
+  /// Also refreshes LibraryController to keep both screens in sync
+  Future<void> deleteRecording(String recordingId) async {
+    try {
+      // Optimistic update: remove from recentSummaries list first
+      recentSummaries.removeWhere((summary) => 
+        (summary['recording_id'] ?? '').toString() == recordingId);
+      
+      // Also remove from inProgress if it's there
+      inProgress.removeWhere((rec) => 
+        (rec['id'] ?? '').toString() == recordingId);
+      inProgressCount.value = inProgress.length;
+      
+      // Perform deletion via edge function
+      await RecordingDeleteService().deleteRecording(recordingId);
+      
+      // Refresh to ensure consistency (will also update actionInbox)
+      await _fetchAll();
+      
+      // Refresh LibraryController to keep Home and Library in sync
+      try {
+        if (Get.isRegistered<LibraryController>()) {
+          final libraryController = Get.find<LibraryController>();
+          await libraryController.fetch();
+        }
+      } catch (e) {
+        // LibraryController might not be registered yet, that's okay
+        debugPrint('[HOME] Could not refresh LibraryController: $e');
+      }
+    } catch (e) {
+      // On error, refresh to restore the item
+      await _fetchAll();
+      logx('[HOME] Delete failed: ${e.toString()}', tag: 'HOME');
+      rethrow;
     }
   }
 

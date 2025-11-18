@@ -35,9 +35,17 @@ class CustomBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomNavActiveColor = const Color(0xFF6E56CF); // brand purple already used
+    final bottomNavInactiveColor = const Color(0xCC4B5563); // slightly darker for better contrast
+    final borderColor = theme.colorScheme.onSurface.withOpacity(0.12); // subtle top hairline
+
     return Container(
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.transparent,
+        border: Border(
+          top: BorderSide(width: 1.0, color: borderColor),
+        ),
         boxShadow: hasShadow
             ? [
                 BoxShadow(
@@ -89,6 +97,9 @@ class CustomBottomBar extends StatelessWidget {
     required String label,
   }) {
     final isSelected = selectedIndex == index;
+    // Brand-consistent colors scoped locally for this builder
+    const activeColor = Color(0xFF6E56CF);     // brand purple
+    const inactiveColor = Color(0xCC4B5563);  // slightly darker inactive
     
     return GestureDetector(
       onTap: () => onChanged(index),
@@ -109,11 +120,11 @@ class CustomBottomBar extends StatelessWidget {
             label,
             style: isSelected
                 ? TextStyleHelper.instance.body12RegularOpenSans.copyWith(
-                    color: const Color(0xFF6E56CF),   // brand violet
+                    color: activeColor,   // brand violet
                     fontWeight: FontWeight.w600,
                   )
                 : TextStyleHelper.instance.body12RegularOpenSans.copyWith(
-                    color: const Color(0x994B5563), // soft gray/violet
+                    color: inactiveColor, // slightly darker inactive
                     fontWeight: FontWeight.w500,
                   ),
           ),

@@ -30,7 +30,7 @@ class WelcomeCard extends StatelessWidget {
                 Text('Your notes, distilled.',
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 6),
-                Text('Record fast. We handle the rest.',
+                Text('Record once. Search and ask later.',
                     style: Theme.of(context).textTheme.bodyMedium),
               ],
             ),

@@ -18,7 +18,7 @@ class FileUploadService {
   final AuthoritativeUploadService _uploadService = AuthoritativeUploadService();
 
   /// Pick and upload audio file with authoritative pipeline
-  Future<Map<String, dynamic>> pickAndUploadAudioFile() async {
+  Future<Map<String, dynamic>> pickAndUploadAudioFile({ String? summaryStyleOverride }) async {
     try {
       debugPrint('📁 Starting file picker for audio upload...');
 
@@ -88,6 +88,7 @@ class FileUploadService {
           fileBytes: fileBytes,
           originalFilename: file.name,
           durationMs: estimatedDurationMs,
+          summaryStyleOverride: summaryStyleOverride,
           onFunctionInvoke: () {
             // Notify PipelineTracker that function invoke started
             PipelineTracker.I.markInvokeStarted();

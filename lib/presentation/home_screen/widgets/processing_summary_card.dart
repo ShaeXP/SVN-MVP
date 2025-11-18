@@ -35,8 +35,17 @@ class ProcessingSummaryCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('$count notes are processing in the background.',
-                          style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        'Finishing your summaries',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$count recordings are still being summarized.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),

@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'logger.dart';
+import 'haptics_service.dart';
+import '../debug/metrics_tracker.dart';
 
 enum PipeStage { local, uploading, uploaded, transcribing, summarizing, ready, error }
 
@@ -100,6 +102,18 @@ class PipelineTracker extends GetxService {
     logx('[PIPEHUD] Tracking stopped', tag: 'PIPE');
   }
 
+  /// Clear ready/active state so Record tab returns to idle UI
+  void clearReadyState() {
+    debugPrint('[PIPEHUD] clearReadyState called (status=${status.value}, recordingId=${recordingId.value})');
+    stop();
+    // Reset observables to idle/local
+    status.value = PipeStage.local;
+    recordingId.value = null;
+    message.value = '';
+    // Force refresh to ensure dependent UIs rebuild
+    status.refresh();
+    recordingId.refresh();
+  }
 
   void _onRecordingsUpdate(Map<String, dynamic>? row) {
     if (row == null) return;
@@ -121,13 +135,23 @@ class PipelineTracker extends GetxService {
     } else if (recordingStatus == 'transcribing') {
       status.value = PipeStage.transcribing;
       logx('[PIPEHUD] stage: transcribing (driver=realtime)', tag: 'PIPE');
-    } else if (recordingStatus == 'uploaded') {
-      // Check if we have summary to determine if ready
-      // If not, we'll rely on _fetch to check for transcripts/summaries
-      // For now, advance to transcribing if we were uploading
-      if (status.value == PipeStage.uploading) {
-        status.value = PipeStage.transcribing;
-        logx('[PIPEHUD] stage: uploading -> transcribing (status=uploaded, driver=realtime)', tag: 'PIPE');
+    } else if (recordingStatus == 'summarizing') {
+      status.value = PipeStage.summarizing;
+      logx('[PIPEHUD] stage: summarizing (driver=realtime)', tag: 'PIPE');
+    } else if (recordingStatus == 'ready') {
+      final wasNotReady = status.value != PipeStage.ready;
+      status.value = PipeStage.ready;
+      logx('[PIPEHUD] stage: ready (driver=realtime)', tag: 'PIPE');
+      // Haptic feedback when status first becomes ready
+      if (wasNotReady) {
+        HapticsService.success();
+        // Track pipeline completion metrics (debug only)
+        if (kDebugMode) {
+          final recId = recordingId.value;
+          if (recId != null) {
+            MetricsTracker.I.trackPipelineCompletion(recId);
+          }
+        }
       }
     }
   }
@@ -140,11 +164,20 @@ class PipelineTracker extends GetxService {
     }
   }
 
-  void _onSummaryInserted() {
+  void _onSummaryInserted() async {
     _lastRealtimeEvent = DateTime.now();
     if (status.value == PipeStage.summarizing) {
       status.value = PipeStage.ready;
       logx('[PIPEHUD] stage: summarizing -> ready (driver=realtime)', tag: 'PIPE');
+      // Haptic feedback when summary becomes ready
+      await HapticsService.success();
+      // Track pipeline completion metrics (debug only)
+      if (kDebugMode) {
+        final recId = recordingId.value;
+        if (recId != null) {
+          MetricsTracker.I.trackPipelineCompletion(recId);
+        }
+      }
     }
   }
 
@@ -309,16 +342,10 @@ class PipelineTracker extends GetxService {
           derivedStage = PipeStage.uploading; // Keep uploading stage to show proper UI
         } else if (recordingStatus == 'transcribing') {
           derivedStage = PipeStage.transcribing;
-        } else if (recordingStatus == 'uploaded') {
-          // Status is 'uploaded' - check if we have transcripts/summaries to determine next stage
-          if (hasSummary == true) {
-            derivedStage = PipeStage.ready;
-          } else if (hasTranscript == true && hasSummary == false) {
-            derivedStage = PipeStage.summarizing;
-          } else {
-            // Can't determine from tables, but status says uploaded, so likely transcribing next
-            derivedStage = PipeStage.transcribing;
-          }
+        } else if (recordingStatus == 'summarizing') {
+          derivedStage = PipeStage.summarizing;
+        } else if (recordingStatus == 'ready') {
+          derivedStage = PipeStage.ready;
         } else if (hasTranscript == true && hasSummary == false) {
           // Have transcript but no summary yet
           derivedStage = PipeStage.summarizing;
@@ -340,6 +367,14 @@ class PipelineTracker extends GetxService {
           status.value = derivedStage;
           debugPrint('[PIPEHUD] stage: $oldStage -> $derivedStage (driver=poll, status=$recordingStatus)');
           logx('[PIPEHUD] stage: $oldStage -> $derivedStage (driver=poll, status=$recordingStatus)', tag: 'PIPE');
+          
+          // Track pipeline completion metrics when status becomes ready (debug only)
+          if (derivedStage == PipeStage.ready && oldStage != PipeStage.ready && kDebugMode) {
+            final recId = recordingId.value;
+            if (recId != null) {
+              MetricsTracker.I.trackPipelineCompletion(recId);
+            }
+          }
           // Force reactive update - trigger notification even if value is same enum
           status.refresh();
           recordingId.refresh(); // Also refresh recordingId to ensure reactive chain updates

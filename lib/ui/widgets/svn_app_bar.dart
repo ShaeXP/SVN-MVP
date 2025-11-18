@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../../theme/app_text_styles.dart';
 
 class SVNAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showActions;
@@ -18,6 +19,9 @@ class SVNAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
 
     return AppBar(
+      // Home is a root tab; never show an automatic back button here.
+      // Detail screens use their own AppBars for back navigation.
+      automaticallyImplyLeading: false,
       backgroundColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
@@ -44,21 +48,14 @@ class SVNAppBar extends StatelessWidget implements PreferredSizeWidget {
             fit: BoxFit.contain,
           ),
           const SizedBox(width: 10),
-          Text(
-            'SmartVoiceNotes',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 0.2,
-            ),
-          ),
+          Text('SmartVoiceNotes', style: AppTextStyles.appTitle(context).copyWith(color: Colors.white)),
         ],
       ),
       actions: showActions
           ? [
               IconButton(
                 icon: Icon(
-                  isEditing ? Icons.check : Icons.edit_outlined, 
+                  isEditing ? Icons.check : Icons.more_vert, 
                   color: Colors.white
                 ),
                 onPressed: onEditPressed,

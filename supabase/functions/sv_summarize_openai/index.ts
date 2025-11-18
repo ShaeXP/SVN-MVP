@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const recId = String(body?.recordingId ?? '').trim()
+    const summaryStyle = String(body?.summary_style ?? body?.summaryStyle ?? 'quick_recap')
     if (!recId || !/^[0-9a-fA-F-]{36}$/.test(recId)) return json({ ok:false, code:'bad_request', message:'recordingId required (uuid)' }, 400)
 
     console.log('[sv_summarize_openai] start', { recId, userId: user.id, trace })
@@ -74,13 +75,13 @@ Deno.serve(async (req) => {
     let result: SummJson
 
     if (transcript.length <= maxChars) {
-      result = await llmSummarize(openaiKey, model, transcript, trace)
+      result = await llmSummarize(openaiKey, model, transcript, summaryStyle, trace)
     } else {
       // Map-reduce: chunk → partials → merge
       const chunks = splitTranscript(transcript, 3500) // soft chunk size
       const partials: SummJson[] = []
       for (const ch of chunks) {
-        partials.push(await llmSummarize(openaiKey, model, ch, trace))
+        partials.push(await llmSummarize(openaiKey, model, ch, summaryStyle, trace))
       }
       const merged = await llmMerge(openaiKey, model, partials, trace)
       result = merged
@@ -97,6 +98,7 @@ Deno.serve(async (req) => {
         action_items: result.actionItems ?? [],
         tags: result.tags ?? [],
         confidence: result.confidence ?? 0.0,
+        summary_style: summaryStyle,
       }, { onConflict: 'recording_id' })
       .select()
       .maybeSingle()
@@ -131,7 +133,19 @@ function splitTranscript(s: string, size: number) {
   return out
 }
 
-async function llmSummarize(key: string, model: string, text: string, trace: string): Promise<SummJson> {
+function styleInstruction(key: string): string {
+  switch (key) {
+    case 'organized_by_topic':
+      return 'Group bullets by topic sections (Agenda & Context, Main Discussion, Decisions, Risks/Concerns). Keep the same JSON keys.'
+    case 'decisions_next_steps':
+      return 'Start with a one-sentence TL;DR, enumerate Decisions, Next steps (actionItems), and Open questions within bullets. Keep the same JSON keys.'
+    case 'quick_recap':
+    default:
+      return 'Short summary, crisp bullets, and clear actionItems. Keep JSON tight.'
+  }
+}
+
+async function llmSummarize(key: string, model: string, text: string, summaryStyle: string, trace: string): Promise<SummJson> {
   const system = `You are a surgical editor for meeting/voice notes. Return STRICT JSON only with keys:
 - title: short, informative
 - summary: 3–6 sentences max
@@ -140,7 +154,7 @@ async function llmSummarize(key: string, model: string, text: string, trace: str
 - tags: 3–6 topical tags (lowercase)
 - confidence: number 0.0–1.0 based on transcript clarity and decisiveness
 No prose outside JSON.`
-  const user = `TRANSCRIPT:\n${text}\n\nReturn JSON only.`
+  const user = `TRANSCRIPT:\n${text}\n\nSTYLE: ${styleInstruction(summaryStyle)}\nReturn JSON only.`
   const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },

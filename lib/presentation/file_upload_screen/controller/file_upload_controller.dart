@@ -1,5 +1,6 @@
 import 'package:lashae_s_application/app/routes/app_routes.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../../app/routes/recording_details_args.dart';
 
@@ -11,6 +12,7 @@ import '../../../domain/recordings/recording_status.dart';
 import '../../../domain/recordings/pipeline_view_state.dart';
 import '../../../services/pipeline_realtime_helper.dart';
 import '../../../services/realtime_helper.dart';
+import '../../../debug/metrics_tracker.dart';
 
 class FileUploadController extends GetxController {
   final FileUploadService _fileUploadService = FileUploadService.instance;
@@ -36,6 +38,14 @@ class FileUploadController extends GetxController {
     // Listen for pipeline completion
     ever(PipelineTracker.I.status, (PipeStage stage) {
       if (stage == PipeStage.ready) {
+        // Track pipeline completion metrics (debug only)
+        if (kDebugMode) {
+          final recordingId = PipelineTracker.I.recordingId.value;
+          if (recordingId != null) {
+            MetricsTracker.I.trackPipelineCompletion(recordingId);
+          }
+        }
+        
         // Pipeline complete - navigate to summary
         final runId = PipelineTracker.I.recordingId.value;
         if (runId != null) {

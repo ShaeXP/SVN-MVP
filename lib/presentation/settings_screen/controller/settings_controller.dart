@@ -22,12 +22,12 @@ class SettingsController extends GetxController {
 
   // Persistent app preferences
   final normalizeAudio = false.obs;        // Audio pre-process switch
-  final summarizeStyle = 'concise_actions'.obs; // enum-like key
+  final summarizeStyle = 'quick_recap'.obs; // enum-like key
 
   // NEW – Audio & AI
   final autoTrimSilence = true.obs;          // UI toggle; backend handles trimming
   final languageHint = 'auto'.obs;           // 'auto', 'en', 'es', etc.
-  final autoSendEmail = false.obs;           // after summary
+  final autoSendEmail = true.obs;            // after summary (ON by default)
 
   // NEW – Privacy
   final analyticsOptIn = false.obs;
@@ -47,7 +47,8 @@ class SettingsController extends GetxController {
 
   // Preferences keys
   static const _kNormalize = 'normalize_audio';
-  static const _kStyle = 'summarize_style';
+  static const _kStyle = 'default_summary_style';
+  static const _kLegacyStyle = 'summarize_style';
   static const _kTrim = 'auto_trim';
   static const _kLang = 'language_hint';
   static const _kAutoEmail = 'auto_email';
@@ -295,10 +296,11 @@ class SettingsController extends GetxController {
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
     normalizeAudio.value = p.getBool(_kNormalize) ?? false;
-    summarizeStyle.value = p.getString(_kStyle) ?? 'concise_actions';
+    // Prefer new key; fallback to legacy; default quick_recap
+    summarizeStyle.value = p.getString(_kStyle) ?? p.getString(_kLegacyStyle) ?? 'quick_recap';
     autoTrimSilence.value = p.getBool(_kTrim) ?? true;
     languageHint.value = p.getString(_kLang) ?? 'auto';
-    autoSendEmail.value = p.getBool(_kAutoEmail) ?? false;
+    autoSendEmail.value = p.getBool(_kAutoEmail) ?? true; // ON by default
 
     analyticsOptIn.value = p.getBool(_kAnalytics) ?? false;
     crashOptIn.value = p.getBool(_kCrash) ?? false;
@@ -330,6 +332,7 @@ class SettingsController extends GetxController {
     summarizeStyle.value = v;
     final p = await SharedPreferences.getInstance();
     await p.setString(_kStyle, v);
+    await p.setString(_kLegacyStyle, v); // maintain legacy key for compatibility
   }
 
   /// Set auto trim preference

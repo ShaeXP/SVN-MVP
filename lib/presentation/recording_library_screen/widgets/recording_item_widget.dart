@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../core/app_export.dart';
 import '../../../data/models/recording_item.dart';
 import '../../../widgets/custom_image_view.dart';
+import '../../../utils/haptics.dart';
+import 'status_chip.dart';
 
 class RecordingItemWidget extends StatelessWidget {
   final RecordingItem recording;
@@ -38,7 +40,10 @@ class RecordingItemWidget extends StatelessWidget {
         ),
       ),
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () async {
+          await Haptics.lightTap();
+          onTap();
+        },
         child: Container(
           width: double.infinity,
           padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
@@ -103,26 +108,8 @@ class RecordingItemWidget extends StatelessWidget {
                           ),
                         ),
 
-                        // Status badge
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.h,
-                            vertical: 2.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor('ready'),
-                            borderRadius: BorderRadius.circular(12.h),
-                          ),
-                          child: Text(
-                            'Ready',
-                            style: TextStyleHelper
-                                .instance.body12RegularOpenSans
-                                .copyWith(
-                              color: appTheme.white_A700,
-                              height: 1.17,
-                            ),
-                          ),
-                        ),
+                        // Status pill aligned with summary screen style (30% smaller)
+                        const _ReadyStatusPill(),
                       ],
                     ),
 
@@ -142,13 +129,16 @@ class RecordingItemWidget extends StatelessWidget {
                 ),
               ),
 
-              SizedBox(width: 12.h),
+              SizedBox(width: 16.h),
 
               // Delete button
               if (onDelete != null)
                 GestureDetector(
-                  onTap: onDelete,
-                  child: Container(
+                  onTap: () async {
+                    await Haptics.mediumTap();
+                    onDelete?.call();
+                  },
+                  child: Padding(
                     padding: EdgeInsets.all(8.h),
                     child: Icon(
                       Icons.delete_outline,
@@ -178,5 +168,15 @@ class RecordingItemWidget extends StatelessWidget {
       default:
         return appTheme.gray_500;
     }
+  }
+}
+
+class _ReadyStatusPill extends StatelessWidget {
+  const _ReadyStatusPill();
+
+  @override
+  Widget build(BuildContext context) {
+    // Reuse the shared StatusChip for visual consistency
+    return const StatusChip(status: 'ready');
   }
 }

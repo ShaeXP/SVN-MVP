@@ -10,8 +10,9 @@ import 'package:lashae_s_application/controllers/record_controller.dart';
 import 'package:lashae_s_application/services/pipeline_service.dart';
 import 'package:lashae_s_application/services/audio_recorder_service.dart';
 import 'package:lashae_s_application/app/routes/app_routes.dart';
-import 'package:lashae_s_application/ui/widgets/pipeline_progress_overlay.dart';
 import 'package:lashae_s_application/ui/visuals/brand_background.dart';
+import 'package:lashae_s_application/ui/widgets/offline_banner.dart';
+import '../../theme/app_text_styles.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -21,6 +22,11 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  // Static keys to ensure they are created only once, even if MainNavigation is recreated
+  static GlobalKey<NavigatorState>? _staticHomeKey;
+  static GlobalKey<NavigatorState>? _staticRecordKey;
+  static GlobalKey<NavigatorState>? _staticSettingsKey;
+  
   late final BottomNavController _nav;
   late final GlobalKey<NavigatorState> _homeKey;
   late final GlobalKey<NavigatorState> _recordKey;
@@ -31,9 +37,22 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _nav = BottomNavController.I;
-    _homeKey = Get.nestedKey(0) ?? GlobalKey<NavigatorState>();
-    _recordKey = Get.nestedKey(1) ?? GlobalKey<NavigatorState>();
-    _settingsKey = Get.nestedKey(3) ?? GlobalKey<NavigatorState>();
+    
+    // IMPORTANT: This widget is the ONLY owner of nested keys 0, 1, and 3.
+    // These keys are used for nested navigators within the IndexedStack tabs.
+    // Do NOT create other navigators using these same keys elsewhere in the app.
+    // Use static keys to ensure they are created only once, even if MainNavigation is recreated.
+    
+    // Create keys only once, reuse if they already exist
+    _staticHomeKey ??= Get.nestedKey(0) ?? GlobalKey<NavigatorState>();
+    _staticRecordKey ??= Get.nestedKey(1) ?? GlobalKey<NavigatorState>();
+    _staticSettingsKey ??= Get.nestedKey(3) ?? GlobalKey<NavigatorState>();
+    
+    // Assign to instance variables
+    _homeKey = _staticHomeKey!;
+    _recordKey = _staticRecordKey!;
+    _settingsKey = _staticSettingsKey!;
+    
     _tabs = [
       _NestedNavigator(
         navigatorKey: _homeKey,
@@ -97,46 +116,62 @@ class _MainNavigationState extends State<MainNavigation> {
       },
       child: Scaffold(
         extendBody: true,
-        body: Stack(
+        body: Column(
           children: [
-            const BrandGradientBackground(),
-            Obx(() {
-              debugPrint('[UI][MainNavigation] body rebuilt @ ${DateTime.now().toIso8601String()} index=${_nav.index.value}');
-              return IndexedStack(
-                index: _nav.index.value,
-                children: _tabs,
-              );
-            }),
-            const PipelineProgressOverlay(),
+            const OfflineBanner(),
+            Expanded(
+              child: Stack(
+                children: [
+                  const BrandGradientBackground(),
+                  Obx(() {
+                    debugPrint('[UI][MainNavigation] body rebuilt @ ${DateTime.now().toIso8601String()} index=${_nav.index.value}');
+                    return IndexedStack(
+                      index: _nav.index.value,
+                      children: _tabs,
+                    );
+                  }),
+                ],
+              ),
+            ),
           ],
         ),
         bottomNavigationBar: Obx(() {
           debugPrint('[UI][MainNavigation] bottom nav rebuilt @ ${DateTime.now().toIso8601String()} index=${_nav.index.value}');
-          return NavigationBar(
-            selectedIndex: _nav.index.value,
-            onDestinationSelected: _nav.goTab,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.mic_none),
-                selectedIcon: Icon(Icons.mic),
-                label: 'Record',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.library_music_outlined),
-                selectedIcon: Icon(Icons.library_music),
-                label: 'Library',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
-            ],
+          return NavigationBarTheme(
+            data: NavigationBarThemeData(
+              labelTextStyle: MaterialStateProperty.resolveWith((states) {
+                final selected = states.contains(MaterialState.selected);
+                return selected
+                    ? AppTextStyles.bottomNavLabelSelected(context)
+                    : AppTextStyles.bottomNavLabelUnselected(context);
+              }),
+            ),
+            child: NavigationBar(
+              selectedIndex: _nav.index.value,
+              onDestinationSelected: _nav.goTab,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Home',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.mic_none),
+                  selectedIcon: Icon(Icons.mic),
+                  label: 'Record',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.library_music_outlined),
+                  selectedIcon: Icon(Icons.library_music),
+                  label: 'Library',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
+                  label: 'Settings',
+                ),
+              ],
+            ),
           );
         }),
       ),

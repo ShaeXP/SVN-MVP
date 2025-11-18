@@ -12,12 +12,18 @@ import 'package:lashae_s_application/ui/theme/svn_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../ui/util/safe_ui.dart';
 import '../../controllers/recording_summary_controller.dart';
-import '../../env.dart';
 import '../../ui/util/pipeline_step.dart';
-import '../../ui/widgets/pipeline_progress.dart';
 import '../../ui/widgets/svn_card.dart';
 import '../../ui/app_spacing.dart';
-import '../../ui/widgets/svn_page.dart';
+import '../../ui/widgets/recording_error_panel.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/recording_delete_service.dart';
+import '../home_screen/controller/home_controller.dart';
+import '../library/library_controller.dart';
+import '../../domain/summaries/summary_style.dart';
+import '../../models/summary_style_option.dart';
+import '../../theme/app_text_styles.dart';
+import '../../utils/summary_navigation.dart';
 
 // Function name constant to prevent drift
 const kFnEmailDocx = 'sv_email_summary_docx';
@@ -43,6 +49,9 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
   StreamSubscription<Map<String, dynamic>?>? _recordingSub;
   Map<String, dynamic>? _recordingRow;
   String _recordingStatus = 'processing';
+  String _searchQuery = '';
+  final TextEditingController _questionController = TextEditingController();
+  final List<_NoteQaItem> _qaItems = [];
 
   @override
   void initState() {
@@ -100,6 +109,19 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
 
   Future<void> _summarize() async {
     if (recordingId.isEmpty) return;
+    
+    // Check offline state
+    final connectivity = ConnectivityService.instance;
+    if (connectivity.isOffline.value) {
+      if (mounted) {
+        safeSnackBar(
+          title: 'Offline',
+          message: 'Please reconnect to finish this step.',
+        );
+      }
+      return;
+    }
+    
     setState(() {
       summarizing = true;
     });
@@ -119,14 +141,35 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
 
   Future<void> _rerun() async {
     if (recordingId.isEmpty) return;
+    
+    // Check offline state
+    final connectivity = ConnectivityService.instance;
+    if (connectivity.isOffline.value) {
+      if (mounted) {
+        safeSnackBar(
+          title: 'Offline',
+          message: 'Please reconnect to finish this step.',
+        );
+      }
+      return;
+    }
+    
     setState(() {
       rerunning = true;
     });
     try {
+      // TODO: Implement pipeline retry hook for this recording
+      // For now, use existing rerun logic
       await pipe.rerunByRecordingId(recordingId);
       await _loadSummary();
     } catch (e) {
       debugPrint('Failed to rerun: $e');
+      if (mounted) {
+        safeSnackBar(
+          title: 'Retry Failed',
+          message: 'Could not retry processing. Please try again later.',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -161,8 +204,10 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Recording'),
-        content: const Text('Are you sure you want to delete this recording? This action cannot be undone.'),
+        title: const Text('Delete summary?'),
+        content: const Text(
+          'This will remove this recording and its summary from your library. This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -170,6 +215,9 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -178,9 +226,23 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        // TODO: Implement summary deletion if needed
-        // For now, just show a message that deletion is not available
-        Get.snackbar('Info', 'Summary deletion not yet implemented');
+        // Perform deletion via edge function
+        await RecordingDeleteService().deleteRecording(recordingId);
+        
+        // Refresh HomeController and LibraryController to keep lists in sync
+        if (Get.isRegistered<HomeController>()) {
+          final homeController = Get.find<HomeController>();
+          await homeController.refresh();
+        }
+        if (Get.isRegistered<LibraryController>()) {
+          final libraryController = Get.find<LibraryController>();
+          await libraryController.fetch();
+        }
+        
+        // Pop back to previous screen after successful delete
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
       } catch (e) {
         if (mounted) {
           safeSnackBar(
@@ -200,7 +262,7 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
        if (!mounted) return;
        final status = (row?['status'] ?? 'processing').toString();
        final shouldLoadSummary =
-           (status == 'uploaded' || status == 'processing' || status == 'ready') && summary == null;
+           (status == 'transcribing' || status == 'summarizing' || status == 'ready' || status == 'processing') && summary == null;
       final hasPrevRow = _recordingRow != null;
       final prevStatus = _recordingStatus;
       final prevUpdated = _recordingRow?['updated_at'];
@@ -222,16 +284,181 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
   @override
   void dispose() {
     _recordingSub?.cancel();
+    _questionController.dispose();
     super.dispose();
+  }
+
+  bool _matchesQuery(String text) {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return text.toLowerCase().contains(q);
+  }
+
+  TextSpan _buildHighlightedSpan(String text, TextStyle baseStyle) {
+    final q = _searchQuery.trim();
+    if (q.isEmpty) {
+      return TextSpan(text: text, style: baseStyle);
+    }
+
+    final query = q.toLowerCase();
+    final lower = text.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+
+    while (true) {
+      final index = lower.indexOf(query, start);
+      if (index == -1) {
+        if (start < text.length) {
+          spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+        }
+        break;
+      }
+      if (index > start) {
+        spans.add(TextSpan(text: text.substring(start, index), style: baseStyle));
+      }
+      spans.add(TextSpan(
+        text: text.substring(index, index + query.length),
+        style: baseStyle.copyWith(fontWeight: FontWeight.w600),
+      ));
+      start = index + query.length;
+    }
+
+    return TextSpan(children: spans);
+  }
+
+  List<String> _collectNoteLines() {
+    if (summary == null) return const [];
+    final s = summary!;
+    final lines = <String>[];
+
+    final title = (s['title'] ?? '').toString();
+    if (title.trim().isNotEmpty) {
+      lines.add(title);
+    }
+
+    final main = (s['summary'] ?? '').toString();
+    if (main.trim().isNotEmpty) {
+      lines.addAll(main.split('\n'));
+    }
+
+    if (s['bullets'] is List) {
+      for (final b in (s['bullets'] as List)) {
+        final t = b.toString();
+        if (t.trim().isNotEmpty) {
+          lines.add(t);
+        }
+      }
+    }
+
+    if (s['action_items'] is List) {
+      for (final a in (s['action_items'] as List)) {
+        final t = a.toString();
+        if (t.trim().isNotEmpty) {
+          lines.add(t);
+        }
+      }
+    }
+
+    return lines;
+  }
+
+  void _onAskQuestion() {
+    final query = _questionController.text.trim();
+    if (query.isEmpty || summary == null) return;
+
+    final qLower = query.toLowerCase();
+
+    // Tokenize and remove simple stopwords
+    final tokenPattern = RegExp(r'[^a-z0-9]+');
+    final rawTokens = qLower.split(tokenPattern);
+    const stopwords = {
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'who',
+      'what',
+      'when',
+      'where',
+      'why',
+      'how',
+      'is',
+      'are',
+      'was',
+      'were',
+      'to',
+      'of',
+      'in',
+      'on',
+      'for',
+      'with',
+      'this',
+      'that',
+    };
+
+    final keywords = rawTokens
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty && !stopwords.contains(t))
+        .toList();
+
+    final effectiveKeywords = keywords.isEmpty ? [qLower] : keywords;
+
+    final lines = _collectNoteLines();
+    final scored = <_ScoredLine>[];
+
+    for (final line in lines) {
+      final t = line.trim();
+      if (t.isEmpty) continue;
+      final lower = t.toLowerCase();
+      int score = 0;
+      for (final kw in effectiveKeywords) {
+        if (lower.contains(kw)) {
+          score++;
+        }
+      }
+      if (score > 0) {
+        scored.add(_ScoredLine(text: t, score: score));
+      }
+    }
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    final topMatches = scored.take(5).toList();
+
+    String answer;
+    if (topMatches.isEmpty) {
+      answer = 'I couldn\'t find anything in this note that mentions "$query".';
+    } else {
+      final buffer = StringBuffer();
+      buffer.writeln('Here\'s what this note says related to your question:');
+      buffer.writeln();
+      for (final m in topMatches) {
+        buffer.writeln('• ${m.text}');
+      }
+      answer = buffer.toString().trim();
+    }
+
+    setState(() {
+      _qaItems.insert(0, _NoteQaItem(question: query, answer: answer));
+      _questionController.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Derive a friendly title from loaded summary data with a safe fallback
+    final String appBarTitle = (() {
+      final t = (summary?['title'] as String?)?.trim();
+      if (t != null && t.isNotEmpty) return t;
+      return 'Recording summary';
+    })();
+
     // Show inline error state for invalid arguments
     if (hasInvalidArgs) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Recording Details'),
+          title: const Text('Recording summary'),
           leading: BackButton(
             onPressed: () => Navigator.of(context).pop(),
           ),
@@ -280,10 +507,25 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
     }
 
     return Scaffold(
+      // Match main screens: allow gradient to paint behind the app bar area
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Recording Details'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        title: Text(
+          appBarTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         leading: BackButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            goToLibraryRoot();
+          },
         ),
         actions: [
           // Email DOCX button
@@ -299,13 +541,18 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
             ),
           ),
           // Delete button
-          Material(
-            type: MaterialType.transparency,
-            child: IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete',
-              onPressed: recordingId.isEmpty ? null : () => _deleteRecording(context),
-            ),
+          Builder(
+            builder: (context) {
+              final canDelete = _recordingStatus == 'ready' || _recordingStatus == 'error';
+              return Material(
+                type: MaterialType.transparency,
+                child: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete',
+                  onPressed: (recordingId.isEmpty || !canDelete) ? null : () => _deleteRecording(context),
+                ),
+              );
+            },
           ),
           // DEV: Pipeline Health Check
           Material(
@@ -460,6 +707,37 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
 
                       AppSpacing.v(context, 1),
 
+                      // Error panel for failed recordings
+                      if (_recordingStatus.toLowerCase() == 'error')
+                        RecordingErrorPanel(
+                          recordingId: recordingId,
+                          onRetry: () {
+                            // Stub method - will be implemented when backend retry logic is ready
+                            _rerun();
+                          },
+                        ),
+
+                      if (_recordingStatus.toLowerCase() == 'error')
+                        AppSpacing.v(context, 1),
+
+                      // Local search within this summary
+                      TextField(
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Search in this note...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          isDense: true,
+                        ),
+                      ),
+                      AppSpacing.v(context, 0.75),
+
                       // Summary body
                       if (summary == null) ...[
                         GlassCard(
@@ -470,39 +748,97 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
                         ),
                       ] else ...[
                         // Title
-                        Text((summary!['title'] ?? 'Summary').toString(),
-                            style: Theme.of(context).textTheme.titleLarge),
+                        Builder(
+                          builder: (context) {
+                            final titleText = (summary!['title'] ?? 'Summary').toString();
+                            final baseStyle = Theme.of(context).textTheme.titleLarge ??
+                                Theme.of(context).textTheme.titleMedium ??
+                                const TextStyle(fontSize: 20, fontWeight: FontWeight.w600);
+                            return RichText(
+                              text: _buildHighlightedSpan(titleText, baseStyle),
+                            );
+                          },
+                        ),
                         AppSpacing.v(context, 0.75),
+
+                        // Style label
+                        Builder(builder: (_) {
+                          // Read summary_style_key, summary_style, or summaryStyle (for backward compatibility)
+                          final key = (summary!['summary_style_key'] ?? summary!['summary_style'] ?? summary!['summaryStyle'] ?? 'quick_recap_action_items').toString();
+                          final styleOption = SummaryStyles.byKey(key);
+                          final label = styleOption.label;
+                          debugPrint('[SUMMARY_VIEW] id=${summary!['id']} styleKey=$key, label=$label');
+                          return Text('Style: $label',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ));
+                        }),
+                        AppSpacing.v(context, 0.5),
 
                         // Summary text
                         GlassCard(
-                          child: Text((summary!['summary'] ?? '—').toString(),
-                              style: Theme.of(context).textTheme.bodyMedium),
+                          child: Builder(
+                            builder: (context) {
+                              final summaryText = (summary!['summary'] ?? '—').toString();
+                              final baseStyle = Theme.of(context).textTheme.bodyMedium ??
+                                  const TextStyle(fontSize: 14);
+                              return RichText(
+                                text: _buildHighlightedSpan(summaryText, baseStyle),
+                              );
+                            },
+                          ),
                         ),
                         AppSpacing.v(context, 1),
 
                         // Bullets (if present)
                         if (summary!['bullets'] is List &&
                             (summary!['bullets'] as List).isNotEmpty) ...[
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Key Points', style: Theme.of(context).textTheme.titleMedium),
-                                AppSpacing.v(context, 0.5),
-                                for (final b in (summary!['bullets'] as List))
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(vertical: AppSpacing.base(context) * 0.25),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('•  '),
-                                        Expanded(child: Text(b.toString())),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final allBullets = (summary!['bullets'] as List)
+                                  .map((b) => b.toString())
+                                  .toList();
+                              final visibleBullets = _searchQuery.trim().isEmpty
+                                  ? allBullets
+                                  : allBullets.where(_matchesQuery).toList();
+
+                              if (visibleBullets.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Key Points', style: Theme.of(context).textTheme.titleMedium),
+                                    AppSpacing.v(context, 0.5),
+                                    for (final b in visibleBullets)
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            vertical: AppSpacing.base(context) * 0.25),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text('•  '),
+                                            Expanded(
+                                              child: Builder(
+                                                builder: (context) {
+                                                  final baseStyle =
+                                                      Theme.of(context).textTheme.bodyMedium ??
+                                                          const TextStyle(fontSize: 14);
+                                                  return RichText(
+                                                    text: _buildHighlightedSpan(b, baseStyle),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                           AppSpacing.v(context, 1),
                         ],
@@ -510,34 +846,143 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
                         // Action items
                         if (summary!['action_items'] is List &&
                             (summary!['action_items'] as List).isNotEmpty) ...[
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Action Items', style: Theme.of(context).textTheme.titleMedium),
-                                AppSpacing.v(context, 0.5),
-                                for (final a in (summary!['action_items'] as List))
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(vertical: AppSpacing.base(context) * 0.25),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('✓  '),
-                                        Expanded(child: Text(a.toString())),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final allActions = (summary!['action_items'] as List)
+                                  .map((a) => a.toString())
+                                  .toList();
+                              final visibleActions = _searchQuery.trim().isEmpty
+                                  ? allActions
+                                  : allActions.where(_matchesQuery).toList();
+
+                              if (visibleActions.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Action Items', style: Theme.of(context).textTheme.titleMedium),
+                                    AppSpacing.v(context, 0.5),
+                                    for (final a in visibleActions)
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            vertical: AppSpacing.base(context) * 0.25),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text('✓  '),
+                                            Expanded(
+                                              child: Builder(
+                                                builder: (context) {
+                                                  final baseStyle =
+                                                      Theme.of(context).textTheme.bodyMedium ??
+                                                          const TextStyle(fontSize: 14);
+                                                  return RichText(
+                                                    text: _buildHighlightedSpan(a, baseStyle),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                           AppSpacing.v(context, 1),
                         ],
                       ],
 
-                      // Raw notes
-                      Text('Raw Notes', style: Theme.of(context).textTheme.titleLarge),
-                      AppSpacing.v(context, 0.75),
-                      _rawNotesCard(),
+                      // Ask-a-question section (local, this-note only)
+                      Builder(
+                        builder: (context) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ask a question about this note',
+                                style: AppTextStyles.sectionTitle(context),
+                              ),
+                              AppSpacing.v(context, 0.25),
+                              Text(
+                                'We’ll answer using only this note’s transcript and summary.',
+                                style: AppTextStyles.bodySecondary(context),
+                              ),
+                              AppSpacing.v(context, 0.75),
+                              GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextField(
+                                            controller: _questionController,
+                                            onSubmitted: (_) => _onAskQuestion(),
+                                            decoration: const InputDecoration(
+                                              hintText: 'Ask a question about this note...',
+                                              isDense: true,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: const Icon(Icons.send),
+                                          tooltip: 'Ask',
+                                          onPressed: _onAskQuestion,
+                                        ),
+                                      ],
+                                    ),
+                                    if (_qaItems.isNotEmpty) ...[
+                                      AppSpacing.v(context, 0.75),
+                                      for (final item in _qaItems.take(3)) ...[
+                                        Text(
+                                          'You',
+                                          style: AppTextStyles.bodySecondary(context),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceVariant
+                                                .withValues(alpha: 0.8),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          child: Text(item.question),
+                                        ),
+                                        AppSpacing.v(context, 0.5),
+                                        Text(
+                                          'Answer',
+                                          style: AppTextStyles.bodySecondary(context),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surface
+                                                .withValues(alpha: 0.9),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          child: Text(item.answer),
+                                        ),
+                                        AppSpacing.v(context, 0.75),
+                                      ],
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                       ],
                     ),
                   ),
@@ -551,54 +996,54 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
   }
 
   Widget _rawNotesCard() {
-     final controller = Get.find<RecordingSummaryController>();
-     return Obx(() => GlassCard(
-       child: Column(
-         crossAxisAlignment: CrossAxisAlignment.start,
-         children: [
-           if (controller.saving.value) 
-             Padding(
-               padding: EdgeInsets.only(bottom: AppSpacing.base(context) * 0.5),
-               child: Text(
-                 'Saving…',
-                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                   color: Theme.of(context).colorScheme.primary,
-                 ),
-               ),
-             ),
-           TextField(
-             key: const Key('notes_editor'),
-             controller: TextEditingController.fromValue(
-               TextEditingValue(
-                 text: controller.notes.value, 
-                 selection: TextSelection.collapsed(offset: controller.notes.value.length)
-               ),
-             ),
-             onChanged: controller.onNotesChanged,
-             minLines: 2,
-             maxLines: 8,
-             textInputAction: TextInputAction.newline,
-             decoration: const InputDecoration(
-               hintText: 'Add your notes…',
-               border: OutlineInputBorder(borderSide: BorderSide.none),
-               filled: true,
-             ),
-           ),
-           AppSpacing.v(context, 0.5),
-           Text(
-             controller.saving.value ? 'Saving…' : 'Saved automatically',
-             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                 ),
-           ),
-         ],
-       ),
-     ));
-   }
+    final controller = Get.find<RecordingSummaryController>();
+    return Obx(() => GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (controller.saving.value)
+                Padding(
+                  padding: EdgeInsets.only(bottom: AppSpacing.base(context) * 0.5),
+                  child: Text(
+                    'Saving…',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+                ),
+              TextField(
+                key: const Key('notes_editor'),
+                controller: TextEditingController.fromValue(
+                  TextEditingValue(
+                    text: controller.notes.value,
+                    selection: TextSelection.collapsed(offset: controller.notes.value.length),
+                  ),
+                ),
+                onChanged: controller.onNotesChanged,
+                minLines: 2,
+                maxLines: 8,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(
+                  hintText: 'Add your notes…',
+                  border: OutlineInputBorder(borderSide: BorderSide.none),
+                  filled: true,
+                ),
+              ),
+              AppSpacing.v(context, 0.5),
+              Text(
+                controller.saving.value ? 'Saving…' : 'Saved automatically',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+              ),
+            ],
+          ),
+        ));
+  }
 
   Future<void> _emailDocx() async {
     final client = Supabase.instance.client;
-    
+
     // Use currentSession; optional refresh
     final session = client.auth.currentSession;
     String? token = session?.accessToken;
@@ -616,38 +1061,51 @@ class _RecordingSummaryScreenState extends State<RecordingSummaryScreen> {
       Get.snackbar('Sign in required', 'Please sign in to email this summary.');
       return;
     }
-    
+
     setState(() => _sendingDocx = true);
-    
+
     const kFnEmailDocx = 'sv_email_summary_docx';
-    
+
     try {
       // Get summaryId if available from the summary data
       String? latestSummaryId;
       if (summary != null && summary!['id'] != null) {
         latestSummaryId = summary!['id'].toString();
       }
-      
+
       debugPrint('[EMAIL_DOCX] invoking $kFnEmailDocx rec=$recordingId sum=$latestSummaryId');
       final resp = await client.functions.invoke(
         kFnEmailDocx,
         headers: {'Authorization': 'Bearer $token'},
         body: {
-          'recordingId': recordingId,          // existing screen variable
-          'summaryId': latestSummaryId,        // include if available; else omit
+          'recordingId': recordingId, // existing screen variable
+          'summaryId': latestSummaryId, // include if available; else omit
         },
       );
       final data = resp.data as Map?;
       final ok = data?['ok'] == true;
       final msgId = data?['id'];
-      Get.snackbar(ok ? 'Sent' : 'Failed',
-        ok ? 'Check your inbox. ID: $msgId' : '${resp.data}');
+      Get.snackbar(ok ? 'Sent' : 'Failed', ok ? 'Check your inbox. ID: $msgId' : '${resp.data}');
     } catch (e) {
       Get.snackbar('Failed', '$e');
     } finally {
       setState(() => _sendingDocx = false);
     }
   }
+}
+
+class _NoteQaItem {
+  final String question;
+  final String answer;
+
+  _NoteQaItem({required this.question, required this.answer});
+}
+
+class _ScoredLine {
+  final String text;
+  final int score;
+
+  _ScoredLine({required this.text, required this.score});
 }
 
 class _ExpandableTextCard extends StatefulWidget {

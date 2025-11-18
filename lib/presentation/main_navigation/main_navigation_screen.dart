@@ -7,6 +7,7 @@ import '../../widgets/custom_bottom_bar.dart';
 import '../home_screen/home_screen.dart';
 import '../library/library_screen.dart';
 import '../settings_screen/settings_screen.dart';
+import '../record_screen/record_screen.dart';
 import './controller/main_navigation_controller.dart';
 
 class MainNavigationScreen extends StatelessWidget {
@@ -18,16 +19,16 @@ class MainNavigationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.green, // DEBUG
       body: Stack(
         children: [
-          const BrandGradientBackground(),
+          const ColoredBox(color: Colors.blue), // DEBUG
           SafeArea(
             child: Obx(() => IndexedStack(
               index: controller.selectedIndex.value,
               children: const [
                 HomeScreen(),
-                LibraryScreen(), 
+                RecordScreen(),
                 SettingsScreen(),
               ],
             )),

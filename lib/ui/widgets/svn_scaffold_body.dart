@@ -4,7 +4,7 @@ import '../app_spacing.dart';
 
 typedef ScrollBuilder = Widget Function(EdgeInsets padding);
 
-class SVNScaffoldBody extends StatelessWidget {
+class SVNScaffoldBody extends StatefulWidget {
   const SVNScaffoldBody({
     super.key,
     this.banner,
@@ -23,42 +23,61 @@ class SVNScaffoldBody extends StatelessWidget {
   final EdgeInsets? _padding;
 
   @override
-  Widget build(BuildContext context) {
-    final padding = _padding ?? AppSpacing.screenPadding(context);
+  State<SVNScaffoldBody> createState() => _SVNScaffoldBodyState();
+}
 
+class _SVNScaffoldBodyState extends State<SVNScaffoldBody> {
+  @override
+  Widget build(BuildContext context) {
+    final padding = widget._padding ?? AppSpacing.screenPadding(context);
+
+    Widget buildScrollable() {
+      return LayoutBuilder(
+        key: const ValueKey('svn_scaffold_layout'), // Stable key to prevent unnecessary rebuilds
+        builder: (context, constraints) {
+          // DO NOT mutate any state here - only build widgets from constraints
+          // DO NOT call setState, update Rx values, or modify controller state
+          // This builder must be pure: compute widgets from constraints and props only
+          Widget scrollable;
+
+          if (widget.scrollBuilder != null) {
+            scrollable = widget.scrollBuilder!(padding);
+          } else {
+            scrollable = SingleChildScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              padding: padding,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: widget.child!,
+              ),
+            );
+          }
+
+          if (widget.onRefresh != null) {
+            scrollable = RefreshIndicator(
+              onRefresh: widget.onRefresh!,
+              child: scrollable,
+            );
+          }
+
+          return scrollable;
+        },
+      );
+    }
+
+    // If there's no banner, return scrollable content directly (no Column wrapper)
+    if (widget.banner == null) {
+      return buildScrollable();
+    }
+
+    // When banner exists, use Column layout
     return Column(
       children: [
-        if (banner != null) banner!,
+        widget.banner!,
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              Widget scrollable;
-
-              if (scrollBuilder != null) {
-                scrollable = scrollBuilder!(padding);
-              } else {
-                scrollable = SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  padding: padding,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                    child: child!,
-                  ),
-                );
-              }
-
-              if (onRefresh != null) {
-                scrollable = RefreshIndicator(
-                  onRefresh: onRefresh!,
-                  child: scrollable,
-                );
-              }
-
-              return scrollable;
-            },
-          ),
+          child: buildScrollable(),
         ),
       ],
     );

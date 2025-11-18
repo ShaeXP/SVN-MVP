@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:get/get.dart';
 import 'package:lashae_s_application/services/pipeline_tracker.dart';
+import 'package:lashae_s_application/presentation/recording_screen/recording_screen_controller.dart';
 
 class AnimatedPipelineCard extends StatelessWidget {
   const AnimatedPipelineCard({
@@ -186,8 +189,50 @@ class _ErrorView extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'Retry your upload',
-          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
           textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        // Action buttons
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () {
+                // Try to find RecordingScreenController
+                try {
+                  final controller = Get.find<RecordingScreenController>();
+                  controller.retryLastUpload();
+                } catch (e) {
+                  // Controller not found - show message
+                  // This can happen if the error card is shown in a different context
+                  debugPrint('[ErrorView] RecordingScreenController not found: $e');
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Retry'),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () {
+                // Try to find RecordingScreenController
+                try {
+                  final controller = Get.find<RecordingScreenController>();
+                  controller.resetRecordUiState();
+                } catch (e) {
+                  // Controller not found - just stop tracking
+                  PipelineTracker.I.stop();
+                  debugPrint('[ErrorView] RecordingScreenController not found, stopping tracker: $e');
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white.withValues(alpha: 0.7),
+              ),
+              child: const Text('Start over'),
+            ),
+          ],
         ),
       ],
     );
