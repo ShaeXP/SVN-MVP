@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/auth_guard.dart';
 import '../../utils/error_message_helper.dart';
 import '../../services/recording_delete_service.dart';
+import '../../services/ask_sessions_service.dart';
+import '../../models/ask_session.dart';
 import '../home_screen/controller/home_controller.dart';
 
 final supabase = Supabase.instance.client;
@@ -31,6 +33,10 @@ class LibraryController extends GetxController {
   final searchQuery = ''.obs;
   final recentlyCreatedRecordingId = RxString('');
   
+  // Ask Sessions state
+  final recentAskSessions = <AskSession>[].obs;
+  final isLoadingAskSessions = false.obs;
+  
   Timer? _pollingTimer;
   Timer? _highlightTimer;
   int _pollingBackoff = 10; // seconds
@@ -40,6 +46,7 @@ class LibraryController extends GetxController {
     super.onInit();
     fetch();
     startPolling();
+    loadRecentAskSessions();
   }
 
   @override
@@ -210,6 +217,21 @@ class LibraryController extends GetxController {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
+  }
+
+  /// Load recent ask sessions with safe error handling
+  Future<void> loadRecentAskSessions() async {
+    try {
+      isLoadingAskSessions.value = true;
+      final sessions = await AskSessionsService.instance.fetchRecentSessions(limit: 5);
+      recentAskSessions.assignAll(sessions);
+    } catch (e, st) {
+      debugPrint('[ASK_SESSIONS] Library load failed: $e');
+      debugPrint('$st');
+      recentAskSessions.clear();
+    } finally {
+      isLoadingAskSessions.value = false;
+    }
   }
 
   /// Delete a recording (hard delete via edge function)

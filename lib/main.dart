@@ -6,6 +6,7 @@ import 'package:lashae_s_application/env.dart';
 import 'package:lashae_s_application/services/supabase_service.dart';
 import 'package:lashae_s_application/services/onboarding_service.dart';
 import 'package:lashae_s_application/services/pipeline_tracker.dart';
+import 'package:lashae_s_application/services/ask_sessions_service.dart';
 import 'package:lashae_s_application/bootstrap_supabase.dart';
 import 'package:lashae_s_application/core/utils/preview_mode_detector.dart';
 import 'package:lashae_s_application/theme/app_theme_data.dart';
@@ -47,6 +48,15 @@ Future<void> main() async {
       () async => PipelineTracker().init(),
       permanent: true,
     );
+
+    // Debug: Fetch recent ask sessions on startup
+    try {
+      final sessions = await AskSessionsService.instance.fetchRecentSessions(limit: 3);
+      debugPrint('[ASK_SESSIONS] Loaded ${sessions.length} recent sessions on startup');
+    } catch (e, st) {
+      debugPrint('[ASK_SESSIONS] Startup fetch failed: $e');
+      debugPrint('$st');
+    }
 
     // Set up global error widget to prevent white screen crashes
     ErrorWidget.builder = (details) {

@@ -12,6 +12,7 @@ import '../../ui/widgets/recording_card.dart';
 import '../../app/navigation/bottom_nav_controller.dart';
 import '../../services/connectivity_service.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/date_formatter.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
@@ -175,28 +176,125 @@ class LibraryScreen extends StatelessWidget {
                   return SVNScaffoldBody(
                     banner: null,
                     onRefresh: ctrl.fetch,
-                    scrollBuilder: (padding) => ListView.separated(
+                    scrollBuilder: (padding) => ListView(
                       padding: EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
                         vertical: AppSpacing.md,
                       ),
                       physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => SizedBox(height: AppSpacing.md),
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        // Only show delete for ready or error status
-                        final canDelete = item.status == 'ready' || item.status == 'error';
-                        return RecordingCard(
-                          item: item,
-                          showExportButton: true,
-                          onExport: () => _showExportOptions(context, item),
-                          showDeleteButton: canDelete,
-                          onDelete: canDelete
-                              ? () => _confirmDeleteRecording(context, ctrl, item)
-                              : null,
-                        );
-                      },
+                      children: [
+                        // Recent Ask Sessions (LAB) section
+                        Obx(() {
+                          final sessions = ctrl.recentAskSessions;
+                          if (sessions.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Recent Ask Sessions',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'LAB',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                ...sessions.map((session) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (session.persona.isNotEmpty)
+                                            Text(
+                                              session.persona,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Theme.of(context).colorScheme.onSurface,
+                                              ),
+                                            ),
+                                          if (session.persona.isNotEmpty) const SizedBox(height: 4),
+                                          Text(
+                                            session.lastQuestion,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Theme.of(context).colorScheme.onSurface,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            DateFormatter.formatAsTodayTimeOrDate(session.createdAt),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          );
+                        }),
+                        // Recording list
+                        ...items.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final item = entry.value;
+                          // Only show delete for ready or error status
+                          final canDelete = item.status == 'ready' || item.status == 'error';
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: index < items.length - 1 ? AppSpacing.md : 0),
+                            child: RecordingCard(
+                              item: item,
+                              showExportButton: true,
+                              onExport: () => _showExportOptions(context, item),
+                              showDeleteButton: canDelete,
+                              onDelete: canDelete
+                                  ? () => _confirmDeleteRecording(context, ctrl, item)
+                                  : null,
+                            ),
+                          );
+                        }).toList(),
+                      ],
                     ),
                   );
                 }),
