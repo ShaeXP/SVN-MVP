@@ -13,13 +13,15 @@ class _UploadRedirectPageState extends State<UploadRedirectPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final navigatorContext = context;
       await Get.toNamed(
         BottomNavController.routeRecord,
         arguments: {'autoUpload': true},
         id: 1,
       );
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context); // remove the redirect page from stack
+      if (mounted && navigatorContext.mounted && Navigator.canPop(navigatorContext)) {
+        Navigator.pop(navigatorContext); // remove the redirect page from stack
       }
     });
   }

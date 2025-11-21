@@ -68,9 +68,10 @@ Widget _buildReadOnlySections(
         if (section == HomeSection.welcome)
           Obx(() {
             if (onboardingService.isHomeOnboardingDismissed) {
-              return const SizedBox.shrink();
+              return const SizedBox.shrink(key: ValueKey('onboarding_dismissed'));
             }
             return Column(
+              key: const ValueKey('onboarding_strip'),
               children: [
                 HomeOnboardingStrip(
                   onDismiss: () => onboardingService.dismissHomeOnboarding(),

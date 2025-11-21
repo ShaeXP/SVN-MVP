@@ -55,6 +55,7 @@ class _MainNavigationState extends State<MainNavigation> {
     
     _tabs = [
       _NestedNavigator(
+        key: const ValueKey('home_navigator'),
         navigatorKey: _homeKey,
         initialRoute: Routes.home,
         onGenerateRoute: (settings) => GetPageRoute(
@@ -63,6 +64,7 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
       ),
       _NestedNavigator(
+        key: const ValueKey('record_navigator'),
         navigatorKey: _recordKey,
         initialRoute: Routes.record,
         onGenerateRoute: (settings) {
@@ -73,8 +75,9 @@ class _MainNavigationState extends State<MainNavigation> {
           );
         },
       ),
-      const LibraryScreen(),
+      const LibraryScreen(key: ValueKey('library_screen')),
       _NestedNavigator(
+        key: const ValueKey('settings_navigator'),
         navigatorKey: _settingsKey,
         initialRoute: Routes.settings,
         onGenerateRoute: (settings) => GetPageRoute(
@@ -101,6 +104,16 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // Extract theme-dependent data outside Obx to avoid InheritedWidget dependencies
+    final navBarTheme = NavigationBarThemeData(
+      labelTextStyle: MaterialStateProperty.resolveWith((states) {
+        final selected = states.contains(MaterialState.selected);
+        return selected
+            ? AppTextStyles.bottomNavLabelSelected(context)
+            : AppTextStyles.bottomNavLabelUnselected(context);
+      }),
+    );
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -124,9 +137,11 @@ class _MainNavigationState extends State<MainNavigation> {
                 children: [
                   const BrandGradientBackground(),
                   Obx(() {
-                    debugPrint('[UI][MainNavigation] body rebuilt @ ${DateTime.now().toIso8601String()} index=${_nav.index.value}');
+                    final currentIndex = _nav.index.value;
+                    debugPrint('[UI][MainNavigation] body rebuilt @ ${DateTime.now().toIso8601String()} index=$currentIndex');
                     return IndexedStack(
-                      index: _nav.index.value,
+                      key: ValueKey('indexed_stack_$currentIndex'),
+                      index: currentIndex,
                       children: _tabs,
                     );
                   }),
@@ -135,19 +150,14 @@ class _MainNavigationState extends State<MainNavigation> {
             ),
           ],
         ),
-        bottomNavigationBar: Obx(() {
-          debugPrint('[UI][MainNavigation] bottom nav rebuilt @ ${DateTime.now().toIso8601String()} index=${_nav.index.value}');
-          return NavigationBarTheme(
-            data: NavigationBarThemeData(
-              labelTextStyle: MaterialStateProperty.resolveWith((states) {
-                final selected = states.contains(MaterialState.selected);
-                return selected
-                    ? AppTextStyles.bottomNavLabelSelected(context)
-                    : AppTextStyles.bottomNavLabelUnselected(context);
-              }),
-            ),
-            child: NavigationBar(
-              selectedIndex: _nav.index.value,
+        bottomNavigationBar: NavigationBarTheme(
+          data: navBarTheme,
+          child: Obx(() {
+            final currentIndex = _nav.index.value;
+            debugPrint('[UI][MainNavigation] bottom nav rebuilt @ ${DateTime.now().toIso8601String()} index=$currentIndex');
+            return NavigationBar(
+              key: const ValueKey('bottom_nav_bar'),
+              selectedIndex: currentIndex,
               onDestinationSelected: _nav.goTab,
               destinations: const [
                 NavigationDestination(
@@ -171,9 +181,9 @@ class _MainNavigationState extends State<MainNavigation> {
                   label: 'Settings',
                 ),
               ],
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -182,6 +192,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
 class _NestedNavigator extends StatelessWidget {
   const _NestedNavigator({
+    super.key,
     required this.navigatorKey,
     required this.initialRoute,
     required this.onGenerateRoute,
