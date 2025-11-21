@@ -15,6 +15,7 @@ import 'package:lashae_s_application/presentation/upload_recording_screen/upload
 import 'package:lashae_s_application/presentation/upload_recording_screen/upload_redirect_page.dart';
 import 'package:lashae_s_application/presentation/splash/app_splash_handoff_screen.dart';
 import 'package:lashae_s_application/presentation/help/how_it_works_screen.dart';
+import 'package:lashae_s_application/presentation/ask_notes_lab_screen/ask_notes_lab_screen.dart';
 import 'app_routes.dart';
 
 class AppPages {
@@ -81,6 +82,7 @@ class AppPages {
         GetPage(name: Routes.recordingPaused, page: () => RecordingPausedScreen()),
         GetPage(name: Routes.uploadRecording, page: () => const UploadRecordingScreen()),
         GetPage(name: '/upload-redirect', page: () => const UploadRedirectPage()),
+        GetPage(name: Routes.askNotesLabScreen, page: () => const AskNotesLabScreen()),
       ],
     ),
 

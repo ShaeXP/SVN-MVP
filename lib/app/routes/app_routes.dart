@@ -26,4 +26,5 @@ abstract class Routes {
   static const recordingPaused = '/recording-paused';
   static const uploadRecording = '/upload-recording';
   static const howItWorks = '/how-it-works';
+  static const askNotesLabScreen = '/ask-notes-lab';
 }

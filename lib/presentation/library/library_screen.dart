@@ -13,6 +13,7 @@ import '../../app/navigation/bottom_nav_controller.dart';
 import '../../services/connectivity_service.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/date_formatter.dart';
+import '../../utils/summary_navigation.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
@@ -227,46 +228,57 @@ class LibraryScreen extends StatelessWidget {
                                 ...sessions.map((session) {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                    child: InkWell(
+                                      onTap: () {
+                                        // Use helper function to match existing navigation pattern
+                                        openAskNotesLab(
+                                          persona: session.persona,
+                                          question: session.lastQuestion,
+                                          answer: session.lastAnswer,
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                          ),
                                         ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (session.persona.isNotEmpty)
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (session.persona.isNotEmpty)
+                                              Text(
+                                                session.persona,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Theme.of(context).colorScheme.onSurface,
+                                                ),
+                                              ),
+                                            if (session.persona.isNotEmpty) const SizedBox(height: 4),
                                             Text(
-                                              session.persona,
+                                              session.lastQuestion,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
+                                                fontSize: 12,
                                                 color: Theme.of(context).colorScheme.onSurface,
                                               ),
                                             ),
-                                          if (session.persona.isNotEmpty) const SizedBox(height: 4),
-                                          Text(
-                                            session.lastQuestion,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Theme.of(context).colorScheme.onSurface,
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              DateFormatter.formatAsTodayTimeOrDate(session.createdAt),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            DateFormatter.formatAsTodayTimeOrDate(session.createdAt),
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                            ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   );

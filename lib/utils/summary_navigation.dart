@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../app/routes/app_routes.dart';
 import '../presentation/recording_summary_screen/recording_summary_screen.dart';
+import '../presentation/ask_notes_lab_screen/ask_notes_lab_screen.dart';
 import 'debug_routes.dart';
 import '../app/navigation/bottom_nav_controller.dart';
 
@@ -49,4 +50,47 @@ Future<void> goToLibraryRoot() async {
 
   // 2) Hard reset to the Library root route inside the main shell
   await Get.offAllNamed(Routes.recordingLibraryScreen);
+}
+
+/// Navigate to Ask Notes LAB screen with optional initial values
+/// Uses same pattern as openRecordingSummary to avoid navigator conflicts
+Future<void> openAskNotesLab({
+  String? persona,
+  String? question,
+  String? answer,
+}) async {
+  const route = Routes.askNotesLabScreen;
+  final args = <String, dynamic>{};
+  if (persona != null && persona.isNotEmpty) {
+    args['persona'] = persona;
+  }
+  if (question != null && question.isNotEmpty) {
+    args['question'] = question;
+  }
+  if (answer != null && answer.isNotEmpty) {
+    args['answer'] = answer;
+  }
+
+  // Ensure Library tab is the active parent
+  try {
+    final nav = BottomNavController.I;
+    await nav.goLibrary();
+  } catch (_) {
+    // If BottomNavController isn't available, continue with navigation
+  }
+
+  // Try named route first
+  final registeredRoutes = Get.routeTree.routes.map((r) => r.name).toList();
+  if (registeredRoutes.contains(route)) {
+    debugPrint('[NAV] toNamed $route args=$args');
+    await Get.toNamed(route, arguments: args);
+    return;
+  }
+
+  // Fallback: direct widget push
+  debugPrint('[NAV] FALLBACK direct → AskNotesLabScreen args=$args');
+  await Get.to(
+    () => const AskNotesLabScreen(),
+    arguments: args,
+  );
 }
