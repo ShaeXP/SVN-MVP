@@ -19,7 +19,47 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<HomeController>();
+    // Safely get HomeController - check if registered first
+    if (!Get.isRegistered<HomeController>()) {
+      // Controller not ready - show loading state
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    HomeController controller;
+    try {
+      controller = Get.find<HomeController>();
+    } catch (e) {
+      // Controller access failed - show error state
+      debugPrint('[HomeScreen] Error accessing HomeController: $e');
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                'Error loading home screen',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Controller not available: $e',
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final topInset = MediaQuery.of(context).padding.top + _kAppBarHeight;
 
     return Scaffold(

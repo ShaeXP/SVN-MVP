@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:lashae_s_application/presentation/auth/controller/auth_controller.dart';
@@ -13,6 +14,9 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  Timer? _navigationTimeout;
+  String? _navigationError;
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +34,12 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
+  @override
+  void dispose() {
+    _navigationTimeout?.cancel();
+    super.dispose();
+  }
+
   void _checkAuthAndNavigate() {
     final supa = Supabase.instance.client;
     final session = supa.auth.currentSession;
@@ -42,12 +52,53 @@ class _AuthGateState extends State<AuthGate> {
       }
       // Only navigate if not already on home route
       if (Get.currentRoute != Routes.home) {
-        Get.offAllNamed(Routes.home);
+        _navigateWithTimeout(Routes.home);
       }
     } else if (session == null) {
       // Signed out - navigate to login
       if (Get.currentRoute != Routes.login) {
-        Get.offAllNamed(Routes.login);
+        _navigateWithTimeout(Routes.login);
+      }
+    }
+  }
+
+  void _navigateWithTimeout(String route) {
+    // Cancel any existing timeout
+    _navigationTimeout?.cancel();
+    
+    // Set navigation timeout (3 seconds)
+    _navigationTimeout = Timer(const Duration(seconds: 3), () {
+      if (mounted && Get.currentRoute != route) {
+        setState(() {
+          _navigationError = 'Navigation to $route timed out. Current route: ${Get.currentRoute}';
+        });
+        debugPrint('[AUTHGATE][ERROR] Navigation timeout: $_navigationError');
+      }
+    });
+
+    try {
+      debugPrint('[AUTHGATE] Navigating to $route from ${Get.currentRoute}');
+      Get.offAllNamed(route);
+      
+      // Cancel timeout if navigation succeeds quickly
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (Get.currentRoute == route) {
+          _navigationTimeout?.cancel();
+          if (mounted) {
+            setState(() {
+              _navigationError = null;
+            });
+          }
+        }
+      });
+    } catch (e, stackTrace) {
+      _navigationTimeout?.cancel();
+      debugPrint('[AUTHGATE][ERROR] Navigation failed: $e');
+      debugPrint('[AUTHGATE][ERROR] Stack: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _navigationError = 'Navigation error: $e';
+        });
       }
     }
   }
@@ -81,9 +132,68 @@ class _AuthGateState extends State<AuthGate> {
         if (Get.isRegistered<AuthController>()) {
           Get.delete<AuthController>();
         }
-        return const Scaffold(
+        
+        // Show error if navigation failed
+        if (_navigationError != null) {
+          return Scaffold(
+            backgroundColor: Colors.red.shade900,
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.white, size: 64),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Navigation Error',
+                      style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _navigationError!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _navigationError = null;
+                        });
+                        _checkAuthAndNavigate();
+                      },
+                      child: const Text('Retry Navigation'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        
+        // Show loading state with visible background
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: Center(
-            child: CircularProgressIndicator(),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                Text(
+                  'Loading...',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current route: ${Get.currentRoute}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }

@@ -10,6 +10,7 @@ import 'package:lashae_s_application/ui/theme/svn_theme.dart';
 import 'package:lashae_s_application/app/navigation/bottom_nav_controller.dart';
 import 'package:lashae_s_application/app/bindings/app_binding.dart';
 import 'package:lashae_s_application/app/routes/app_pages.dart';
+import 'package:lashae_s_application/presentation/navigation/main_navigation.dart';
 import 'package:lashae_s_application/services/connectivity_service.dart';
 import 'package:lashae_s_application/services/permission_service.dart';
 import 'package:lashae_s_application/services/onboarding_service.dart';
@@ -119,8 +120,10 @@ class MyApp extends StatelessWidget {
           transitionDuration: const Duration(milliseconds: 260),
           theme: SVNTheme.theme(context),
           initialBinding: AppBinding(),
-          getPages: AppPages.pages,
-          initialRoute: AppPages.initial,
+          // Temporarily disabled route-based startup to bypass black screen
+          // getPages: AppPages.pages,
+          // initialRoute: AppPages.initial,
+          home: const MainNavigation(),
           unknownRoute: GetPage(
             name: '/404',
             page: () => Scaffold(

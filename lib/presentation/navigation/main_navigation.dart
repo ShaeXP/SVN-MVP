@@ -115,6 +115,7 @@ class _MainNavigationState extends State<MainNavigation> {
         }
       },
       child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         extendBody: true,
         body: Column(
           children: [
@@ -124,9 +125,40 @@ class _MainNavigationState extends State<MainNavigation> {
                 children: [
                   const BrandGradientBackground(),
                   Obx(() {
-                    debugPrint('[UI][MainNavigation] body rebuilt @ ${DateTime.now().toIso8601String()} index=${_nav.index.value}');
+                    final currentIndex = _nav.index.value;
+                    debugPrint('[UI][MainNavigation] body rebuilt @ ${DateTime.now().toIso8601String()} index=$currentIndex tabs=${_tabs.length}');
+                    
+                    // Bounds check for index
+                    if (currentIndex < 0 || currentIndex >= _tabs.length) {
+                      debugPrint('[UI][MainNavigation][ERROR] Invalid index: $currentIndex (tabs: ${_tabs.length})');
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Navigation Error',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Invalid tab index: $currentIndex\nAvailable tabs: ${_tabs.length}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => _nav.goTab(0),
+                              child: const Text('Go to Home'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    
                     return IndexedStack(
-                      index: _nav.index.value,
+                      index: currentIndex,
                       children: _tabs,
                     );
                   }),
